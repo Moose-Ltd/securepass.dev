@@ -1,0 +1,96 @@
+import type { Page } from "@playwright/test";
+import { expect, secret, test } from "./fixtures.ts";
+
+async function inViewport(page: Page, selector: string) {
+  const box = await page.locator(selector).first().boundingBox();
+  const viewport = page.viewportSize()!;
+  expect(box, selector).not.toBeNull();
+  expect(box!.y, `${selector} top`).toBeGreaterThanOrEqual(0);
+  expect(box!.y + box!.height, `${selector} bottom`).toBeLessThanOrEqual(viewport.height);
+  expect(box!.x + box!.width, `${selector} right edge`).toBeLessThanOrEqual(viewport.width);
+}
+
+for (const viewport of [
+  { width: 375, height: 667 },
+  { width: 1366, height: 768 },
+]) {
+  for (const scheme of ["light", "dark"] as const) {
+    test(`AE8: the whole tool is above the fold at ${viewport.width}x${viewport.height} in ${scheme} mode`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.setViewportSize(viewport);
+      await page.goto("/");
+      await secret(page);
+      for (const selector of [
+        ".modes",
+        "[data-secret-value]",
+        '[data-strength="gen"] .meter',
+        '[data-strength="gen"] [data-rating-label]',
+        "#pw-length",
+        '[data-action="regenerate"]',
+        '[data-action="copy"]',
+      ]) {
+        await inViewport(page, selector);
+      }
+      // No horizontal scrolling anywhere on the page.
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    });
+  }
+}
+
+test("the theme override persists across a reload and applies before first paint", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto("/");
+  const toggle = page.locator('[data-action="theme"]');
+  await toggle.click(); // system -> light
+  await toggle.click(); // light -> dark
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.reload();
+  // Read during parsing, before the app script runs: the inline bootstrap already applied it.
+  expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
+  await toggle.click(); // dark -> system
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme", /.+/);
+});
+
+test("mode switches update the URL without a reload, and Back restores the previous mode", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => ((window as unknown as { __marker: boolean }).__marker = true));
+  await page.getByRole("link", { name: "Passphrase", exact: true }).click();
+  await expect(page).toHaveURL(/\/passphrase-generator$/);
+  await expect(page.locator("h1")).toHaveText("Passphrase generator");
+  await expect(page).toHaveTitle(/Passphrase Generator/);
+  await page.getByRole("link", { name: "PIN", exact: true }).click();
+  await expect(page).toHaveURL(/\/pin-generator$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/passphrase-generator$/);
+  await expect(page.locator("h1")).toHaveText("Passphrase generator");
+  await expect(page.locator('[data-options="passphrase"]')).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { __marker?: boolean }).__marker)).toBe(true);
+});
+
+test("AE10: excluding every digit marks digits unavailable and leaves them out", async ({ page }) => {
+  await page.goto("/");
+  await page.getByText("More options").click();
+  await page.getByLabel("Leave out these characters").fill("0123456789");
+  await expect(page.locator("[data-sets-note]")).toContainText("Digits");
+  await expect(page.locator('label:has([data-set="digits"])')).toHaveAttribute("data-unavailable", "");
+  expect(await secret(page)).not.toMatch(/\d/);
+});
+
+test("AE9: the last character type cannot be switched off", async ({ page }) => {
+  await page.goto("/");
+  for (const id of ["upper", "lower", "digits"]) await page.locator(`label:has([data-set="${id}"])`).click();
+  await page.locator('label:has([data-set="symbols"])').click();
+  await expect(page.locator('[data-set="symbols"]')).toBeChecked();
+  await expect(page.locator("[data-sets-note]")).toContainText("At least one");
+  expect((await secret(page)).length).toBe(20);
+});
+
+test("hiding the secret masks it and disables spelling it out", async ({ page }) => {
+  await page.goto("/");
+  const value = await secret(page);
+  await page.getByRole("button", { name: "Hide" }).click();
+  await expect(page.locator("[data-secret-value]")).not.toContainText(value);
+  await expect(page.getByRole("button", { name: "Spell it out" })).toBeDisabled();
+  await page.getByRole("button", { name: "Show" }).click();
+  await expect(page.locator("[data-secret-value]")).toHaveText(value);
+});
