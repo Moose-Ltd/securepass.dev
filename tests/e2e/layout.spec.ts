@@ -149,3 +149,32 @@ test("the secret stays on one line at any length", async ({ page }) => {
   // Too long to show whole: it scrolls sideways, and a fade marks the hidden end.
   await expect(page.locator("[data-secret-value]")).toHaveAttribute("data-overflow", "end");
 });
+
+test("overlays close on Escape (focus returns to their button) or a press outside, and stay open for presses inside", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: async () => {} }, configurable: true });
+  });
+  await page.goto("/");
+  await secret(page);
+  const spellButton = page.getByRole("button", { name: "Spell it out" });
+  const spell = page.locator("[data-spell]");
+  await spellButton.click();
+  await spell.locator("li").first().click();
+  await expect(spell, "a press inside keeps it open").toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(spell).toBeHidden();
+  await expect(spellButton).toBeFocused();
+  await expect(spellButton).toHaveAttribute("aria-expanded", "false");
+
+  const speeds = page.getByRole("button", { name: "Other attack speeds" }).first();
+  await speeds.click();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#crack-gen")).toBeHidden();
+  await expect(speeds).toBeFocused();
+
+  await page.getByRole("button", { name: "Copy" }).click();
+  const notice = page.locator("[data-copy-hint]");
+  await expect(notice).toBeVisible();
+  await page.mouse.click(2, 300);
+  await expect(notice, "a press outside closes the copy notice").toBeHidden();
+});

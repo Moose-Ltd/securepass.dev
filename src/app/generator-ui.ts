@@ -164,6 +164,7 @@ export class Generator {
       this.display.setSpellOpen(open);
     });
     dismissible(spell, this.spell, () => this.closeSpell());
+    dismissible(copy, this.copyHint, () => this.resetCopy());
 
     // Shortcuts work only while focus is inside the tool and never while typing (R41, WCAG 2.1.4).
     regenerate.setAttribute("aria-keyshortcuts", "R");

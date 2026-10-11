@@ -40,7 +40,7 @@ export const prefersReducedMotion = () => (reducedMotion ??= window.matchMedia("
 /** Closes a popover on Escape (returning focus to its button) or on a press outside both of them. */
 export function dismissible(trigger: HTMLElement, popover: HTMLElement, close: () => void): void {
   document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape" || popover.hidden) return;
+    if (event.key !== "Escape" || event.defaultPrevented || popover.hidden) return;
     close();
     trigger.focus();
   });
