@@ -166,7 +166,7 @@ The owner wants a portfolio piece that does the job better than the common gener
   - blocked storage: use defaults silently.
 - R41. Screen-reader and keyboard behaviour:
   - Announcements name what happened ("New 20-character password", "Copied") without reading the secret.
-  - A spell-out view lists each character with its class name.
+  - A spell-out view lists each character of a password or PIN with its class name. A passphrase is spelled out as its numbered words, exactly as generated.
   - Character classes are distinguished by more than colour.
   - Shortcuts work only while focus is inside the tool and never in a text field.
 - R42. When a new version is deployed, a returning visitor sees a small "update ready" notice that reloads on request. The page shows when it is ready to work offline.

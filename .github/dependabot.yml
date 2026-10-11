@@ -1,0 +1,23 @@
+# Weekly update pull requests for npm and the pinned GitHub Actions. A merge to main deploys, so each
+# one is reviewed like any other change. The cooldown keeps brand-new releases out of PRs until the
+# window in which compromised packages are usually caught has passed.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    groups:
+      zxcvbn:
+        patterns: ["@zxcvbn-ts/*"]
+      tooling:
+        patterns: ["vite", "vitest", "typescript", "wrangler", "@playwright/test", "@axe-core/playwright", "@types/node"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7

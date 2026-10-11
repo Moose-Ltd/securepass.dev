@@ -1,0 +1,24 @@
+{
+  "name": "SecurePass: password generator",
+  "short_name": "SecurePass",
+  "description": "Strong passwords, passphrases and PINs made on your device and never sent anywhere. Works offline.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f6fb",
+  "theme_color": "#0b1130",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["security", "utilities", "productivity"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Passphrase generator", "short_name": "Passphrase", "url": "/passphrase-generator", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "PIN generator", "short_name": "PIN", "url": "/pin-generator", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Password strength checker", "short_name": "Check", "url": "/password-strength-checker", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

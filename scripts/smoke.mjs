@@ -1,0 +1,70 @@
+#!/usr/bin/env node
+// Checks the live site after a deploy (R33): every page, the security headers from
+// src/security/headers.ts, the 404 page, the www and HTTP redirects, the discovery files, and that
+// Cloudflare injected nothing into the HTML that the CSP would block.
+//
+//   npm run smoke                      # https://securepass.dev
+//   SMOKE_ORIGIN=http://127.0.0.1:8787 npm run smoke   # a local wrangler dev, skips redirects
+
+const ORIGIN = (process.env.SMOKE_ORIGIN ?? "https://securepass.dev").replace(/\/$/, "");
+const LIVE = ORIGIN === "https://securepass.dev";
+const INJECTED = ["cloudflareinsights", "rocket-loader", "email-decode", "challenge-platform"];
+
+// The TypeScript sources are the single source of truth; Node strips their types natively.
+const { SECURITY_HEADERS } = await import("../src/security/headers.ts");
+const { ROUTES, SITE_ORIGIN } = await import("../src/pages/routes.ts");
+const PAGES = ROUTES.map((r) => r.path);
+
+const failures = [];
+const check = (ok, message) => {
+  process.stdout.write(`${ok ? "ok  " : "FAIL"} ${message}\n`);
+  if (!ok) failures.push(message);
+};
+
+// One retry, so a transient network blip right after a deploy doesn't fail a release that worked.
+async function get(url, init = {}) {
+  const once = () => fetch(url, { redirect: "manual", signal: AbortSignal.timeout(20_000), ...init });
+  try {
+    return await once();
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    return once();
+  }
+}
+
+for (const path of PAGES) {
+  const res = await get(`${ORIGIN}${path}`);
+  const html = await res.text();
+  check(res.status === 200, `${path} returns 200 (got ${res.status})`);
+  for (const header of SECURITY_HEADERS) {
+    check(res.headers.get(header.name) === header.value, `${path} sends ${header.name}`);
+  }
+  for (const marker of INJECTED) check(!html.includes(marker), `${path} has no injected ${marker}`);
+}
+
+const missing = await get(`${ORIGIN}/smoke-check-missing-page`);
+const missingHtml = await missing.text();
+check(missing.status === 404, `unknown path returns 404 (got ${missing.status})`);
+check(missingHtml.includes("noindex"), "404 page is noindex");
+
+const robots = await (await get(`${ORIGIN}/robots.txt`)).text();
+check(robots.includes(`Sitemap: ${SITE_ORIGIN}/sitemap.xml`), "robots.txt names the sitemap");
+const sitemap = await get(`${ORIGIN}/sitemap.xml`);
+check((sitemap.headers.get("content-type") ?? "").includes("xml"), "sitemap.xml is served as XML");
+check((await (await get(`${ORIGIN}/.well-known/security.txt`)).text()).includes("Contact:"), "security.txt is served");
+check((await get(`${ORIGIN}/sw.js`)).headers.get("cache-control") === "no-cache", "sw.js is never cached");
+check((await get(`${ORIGIN}/og/password.png`)).status === 200, "the preview image is served");
+
+if (LIVE) {
+  const www = await get("https://www.securepass.dev/pin-generator?x=1");
+  check(www.status === 301 && www.headers.get("location") === "https://securepass.dev/pin-generator?x=1", `www redirects to the apex (got ${www.status} ${www.headers.get("location")})`);
+  const http = await get("http://securepass.dev/");
+  check([301, 302, 307, 308].includes(http.status) && (http.headers.get("location") ?? "").startsWith("https://"), `plain HTTP redirects to HTTPS (got ${http.status}); if not, turn on Always Use HTTPS for the zone`);
+}
+
+if (failures.length) {
+  process.stderr.write(`\nsmoke: ${failures.length} check(s) failed.\n`);
+  process.exitCode = 1;
+} else {
+  process.stdout.write(`\nsmoke: ${ORIGIN} passed every check.\n`);
+}
