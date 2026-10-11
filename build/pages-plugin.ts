@@ -5,11 +5,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Plugin } from "vite";
 import { esc, renderPage, type PageId } from "../src/pages/render.ts";
-import { ROUTES } from "../src/pages/routes.ts";
+import { CONTENT_PAGES, ROUTES } from "../src/pages/routes.ts";
 
 /** Each stub is marked with its directory name ("index" for the root, "404" for the error page). */
 const STUB_IDS: Record<string, PageId> = {
   ...Object.fromEntries(ROUTES.map((route) => [route.path === "/" ? "index" : route.path.slice(1), route.mode])),
+  ...Object.fromEntries(CONTENT_PAGES.map((page) => [page.path.slice(1), page.id])),
   "404": "not-found",
 };
 

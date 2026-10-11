@@ -1,5 +1,6 @@
-// The four tool pages. This module is shared by the build (which prerenders each page) and the
-// browser (which switches modes without a reload), so it must stay free of Node imports.
+// The four tool pages and the two pages that explain them. This module is shared by the build
+// (which prerenders each page) and the browser (which switches modes without a reload), so it must
+// stay free of Node imports.
 
 export type Mode = "password" | "passphrase" | "pin" | "check";
 
@@ -77,11 +78,52 @@ export function routeForPath(pathname: string): Route | undefined {
   return ROUTES.find((r) => r.path === normalised);
 }
 
-/** The page file a route is built to, relative to the site root ("index.html", "pin-generator/index.html"). */
-export function pageFile(route: Route): string {
-  return route.path === "/" ? "index.html" : `${route.path.slice(1)}/index.html`;
+/** The pages that explain the tool. They live apart from it, so each tool page is one screen. */
+export type ContentId = "how-it-works" | "faq";
+
+export interface ContentPage {
+  id: ContentId;
+  path: string;
+  /** Label in the site navigation. */
+  nav: string;
+  title: string;
+  description: string;
+  h1: string;
+}
+
+export const CONTENT_PAGES: readonly ContentPage[] = [
+  {
+    id: "how-it-works",
+    path: "/how-it-works",
+    nav: "How it works",
+    title: "How SecurePass Keeps Your Passwords Private | SecurePass",
+    description:
+      "How SecurePass makes passwords on your device, checks breaches without sending them and estimates crack time, and how to verify each part yourself.",
+    h1: "How SecurePass works",
+  },
+  {
+    id: "faq",
+    path: "/faq",
+    nav: "FAQ",
+    title: "SecurePass FAQ: Privacy, Offline Use and Strength | SecurePass",
+    description:
+      "Answers about SecurePass: whether passwords are ever sent, offline use, the private breach check, randomness, and what it can't protect against.",
+    h1: "Questions",
+  },
+];
+
+/** Every page with its own URL: the tool modes first, then the content pages. */
+export const PAGE_PATHS: readonly string[] = [...ROUTES.map((r) => r.path), ...CONTENT_PAGES.map((p) => p.path)];
+
+/** The file a page path is built to, relative to the site root ("index.html", "faq/index.html"). */
+export function fileForPath(path: string): string {
+  return path === "/" ? "index.html" : `${path.slice(1)}/index.html`;
+}
+
+export function urlForPath(path: string): string {
+  return path === "/" ? `${SITE_ORIGIN}/` : `${SITE_ORIGIN}${path}`;
 }
 
 export function canonicalUrl(route: Route): string {
-  return route.path === "/" ? `${SITE_ORIGIN}/` : `${SITE_ORIGIN}${route.path}`;
+  return urlForPath(route.path);
 }

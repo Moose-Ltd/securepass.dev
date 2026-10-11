@@ -2,7 +2,7 @@ import { SECURITY_HEADERS, cacheControlFor } from "../../src/security/headers.ts
 import { expect, test } from "./fixtures.ts";
 
 test.describe("response headers", () => {
-  for (const path of ["/", "/passphrase-generator", "/pin-generator", "/password-strength-checker", "/sw.js", "/manifest.webmanifest"]) {
+  for (const path of ["/", "/passphrase-generator", "/pin-generator", "/password-strength-checker", "/how-it-works", "/faq", "/sw.js", "/manifest.webmanifest"]) {
     test(`${path} carries the full security header set`, async ({ request }) => {
       const response = await request.get(path);
       expect(response.status()).toBe(200);
@@ -26,7 +26,7 @@ test.describe("response headers", () => {
   });
 
   test("pages may not be rewritten in transit and revalidate on every load", async ({ request }) => {
-    for (const path of ["/", "/passphrase-generator", "/pin-generator", "/password-strength-checker"]) {
+    for (const path of ["/", "/passphrase-generator", "/pin-generator", "/password-strength-checker", "/how-it-works", "/faq"]) {
       expect((await request.get(path)).headers()["cache-control"], path).toBe("no-transform, public, max-age=0, must-revalidate");
     }
     // Everything else stays compressible: no-transform would also stop Cloudflare's compression.

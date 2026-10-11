@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { CONTENT_SECURITY_POLICY, THEME_BOOTSTRAP, THEME_BOOTSTRAP_HASH, cacheControlFor, renderHeadersFile } from "../../src/security/headers.ts";
-import { ROUTES } from "../../src/pages/routes.ts";
+import { PAGE_PATHS } from "../../src/pages/routes.ts";
 import { renderPage } from "../../src/pages/render.ts";
 
 interface Rule {
@@ -62,12 +62,13 @@ describe("_headers", () => {
     // Without no-transform, Cloudflare injects its analytics beacon into the HTML a browser receives.
     // no-transform also stops Cloudflare compressing, so it stays off scripts, styles and word lists.
     const page = "no-transform, public, max-age=0, must-revalidate";
-    for (const route of ROUTES) {
-      expect(rules.find((r) => r.pattern === route.path)?.headers, route.path).toEqual([["Cache-Control", page]]);
-      expect(cacheControlFor(route.path)).toBe(page);
+    expect(PAGE_PATHS).toEqual(expect.arrayContaining(["/", "/how-it-works", "/faq"]));
+    for (const path of PAGE_PATHS) {
+      expect(rules.find((r) => r.pattern === path)?.headers, path).toEqual([["Cache-Control", page]]);
+      expect(cacheControlFor(path)).toBe(page);
     }
     expect(rules.find((r) => r.pattern === "/*")!.headers.some(([name]) => name === "Cache-Control")).toBe(false);
-    for (const rule of rules.filter((r) => !ROUTES.some((route) => route.path === r.pattern))) {
+    for (const rule of rules.filter((r) => !PAGE_PATHS.includes(r.pattern))) {
       expect(rule.headers.flatMap(([, value]) => value).join(" "), rule.pattern).not.toContain("no-transform");
     }
   });
@@ -79,12 +80,10 @@ describe("_headers", () => {
     expect(policy).not.toContain("interest-cohort");
   });
 
-  it("documents on every page exactly the policy it serves", () => {
-    for (const id of ["password", "passphrase", "pin", "check"] as const) {
-      const html = renderPage(id);
-      for (const directive of CONTENT_SECURITY_POLICY.split("; ")) {
-        expect(html).toContain(`<code>${directive.replace(/'/g, "&#39;")}</code>`);
-      }
+  it("documents on the how-it-works page exactly the policy every page serves", () => {
+    const html = renderPage("how-it-works");
+    for (const directive of CONTENT_SECURITY_POLICY.split("; ")) {
+      expect(html).toContain(`<code>${directive.replace(/'/g, "&#39;")}</code>`);
     }
   });
 });

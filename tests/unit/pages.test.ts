@@ -4,6 +4,7 @@ import { FAQ } from "../../src/pages/content.ts";
 import { RATING_BANDS, renderPage, type PageId } from "../../src/pages/render.ts";
 
 const TOOL_PAGES = ["password", "passphrase", "pin", "check"] as const;
+const CONTENT = ["how-it-works", "faq"] as const;
 
 const attr = (html: string, pattern: RegExp) => pattern.exec(html)?.[1];
 
@@ -37,14 +38,49 @@ describe("prerendered pages", () => {
     }
   });
 
-  it("carries valid structured data, with the FAQ mirroring the visible questions on the home page", () => {
-    const home = jsonLd(renderPage("password"));
-    const faq = home["@graph"].find((n) => n["@type"] === "FAQPage") as { mainEntity: { name: string; acceptedAnswer: { text: string } }[] };
+  it("carries valid structured data, with the FAQ mirroring the visible questions on the FAQ page", () => {
+    const faqPage = jsonLd(renderPage("faq"));
+    const faq = faqPage["@graph"].find((n) => n["@type"] === "FAQPage") as { mainEntity: { name: string; acceptedAnswer: { text: string } }[] };
     expect(faq.mainEntity.map((q) => q.name)).toEqual(FAQ.map((q) => q.question));
     for (const q of faq.mainEntity) expect(q.acceptedAnswer.text).not.toMatch(/<[a-z]/i);
-    const sub = jsonLd(renderPage("pin"));
-    expect(sub["@graph"].some((n) => n["@type"] === "BreadcrumbList")).toBe(true);
-    expect(sub["@graph"].some((n) => n["@type"] === "FAQPage")).toBe(false);
+    for (const question of FAQ) expect(renderPage("faq")).toContain(question.question.replace(/'/g, "&#39;"));
+    const home = jsonLd(renderPage("password"));
+    expect(home["@graph"].some((n) => n["@type"] === "FAQPage")).toBe(false);
+    expect(home["@graph"].some((n) => n["@type"] === "BreadcrumbList")).toBe(false);
+    for (const id of ["pin", "how-it-works"] as const) {
+      const sub = jsonLd(renderPage(id));
+      expect(sub["@graph"].some((n) => n["@type"] === "BreadcrumbList"), id).toBe(true);
+      expect(sub["@graph"].some((n) => n["@type"] === "FAQPage"), id).toBe(false);
+    }
+  });
+
+  it("keeps each tool page to the tool, with the explanations on their own pages", () => {
+    for (const id of TOOL_PAGES) {
+      const html = renderPage(id);
+      expect(html, id).toContain("data-vault");
+      expect(html, id).not.toMatch(/id="(how|breach|crack-time|faq|guides)"/);
+      // The icon's attribution stays on every page that shows it (Flaticon license).
+      expect(html, id).toContain("Security icons created by Vectors Tank - Flaticon");
+      expect(html, id).toContain('href="/how-it-works"');
+      expect(html, id).toContain('href="/faq"');
+    }
+    const how = renderPage("how-it-works");
+    for (const section of ["how", "network", "headers", "breach", "crack-time", "guides", "best-practice"]) expect(how, section).toContain(`id="${section}"`);
+    for (const id of CONTENT) {
+      const html = renderPage(id);
+      expect(html, id).not.toContain("data-vault");
+      expect(html, id).toContain('id="credits"');
+      expect(html, id).toContain("Security icons created by Vectors Tank - Flaticon");
+    }
+  });
+
+  it("gives each explanation page a unique title, description, canonical and H1", () => {
+    const fields = [...TOOL_PAGES, ...CONTENT].map((id) => {
+      const html = renderPage(id);
+      return [attr(html, /<title>([^<]+)<\/title>/), attr(html, /<meta name="description" content="([^"]+)"/), attr(html, /<link rel="canonical" href="([^"]+)"/), attr(html, /<h1[^>]*>([^<]+)<\/h1>/)];
+    });
+    for (let i = 0; i < 4; i++) expect(new Set(fields.map((f) => f[i])).size).toBe(fields.length);
+    expect(attr(renderPage("faq"), /<link rel="canonical" href="([^"]+)"/)).toBe("https://securepass.dev/faq");
   });
 
   it("escapes markup inside JSON-LD so it can never close the script element", () => {
@@ -53,7 +89,7 @@ describe("prerendered pages", () => {
   });
 
   it("uses no style attributes and no inline scripts except the theme bootstrap and JSON-LD", () => {
-    for (const id of [...TOOL_PAGES, "not-found"] as PageId[]) {
+    for (const id of [...TOOL_PAGES, ...CONTENT, "not-found"] as PageId[]) {
       const html = renderPage(id);
       expect(html).not.toMatch(/\sstyle="/);
       const inline = [...html.matchAll(/<script(?![^>]*\ssrc=)([^>]*)>/g)].map((m) => m[1]!.trim());

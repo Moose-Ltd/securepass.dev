@@ -134,7 +134,7 @@ export class Generator {
       this.strength.render({
         rating: null,
         level: Math.min(5, Math.max(1, Math.ceil(bits / 10))),
-        label: "Only where guesses are limited",
+        label: "Only with guess limits",
         bits,
         crackSeconds,
         // Offline, any PIN falls instantly; that figure stays in the attack-speed details.

@@ -6,10 +6,10 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import type { Plugin, ResolvedConfig } from "vite";
-import { ROUTES, pageFile } from "../src/pages/routes.ts";
+import { PAGE_PATHS, fileForPath } from "../src/pages/routes.ts";
 
 /** Page files and the clean URL each is served at (html_handling: drop-trailing-slash). */
-const PAGE_URLS: Record<string, string> = Object.fromEntries(ROUTES.map((route) => [pageFile(route), route.path]));
+const PAGE_URLS: Record<string, string> = Object.fromEntries(PAGE_PATHS.map((path) => [fileForPath(path), path]));
 
 /** Root files worth keeping offline: the install manifest and the icons it and the pages use. */
 const ROOT_FILES = new Set([

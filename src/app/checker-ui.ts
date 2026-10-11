@@ -2,7 +2,7 @@
 // the URL, history state, storage or an announcement, and the field is wiped whenever the user
 // leaves the mode or the page (R36).
 
-import { canCheckBreaches, checkBreach, type BreachFailure } from "../check/breach.ts";
+import { BREACH_API_ORIGIN, canCheckBreaches, checkBreach, onBreachAttempt, type BreachFailure } from "../check/breach.ts";
 import type { Estimator } from "../check/estimator.ts";
 import { RATING_LABELS } from "../core/rating.ts";
 import { announce } from "./announcer.ts";
@@ -11,8 +11,8 @@ import { $, debounce, el } from "./dom.ts";
 import { StrengthBlock } from "./strength-ui.ts";
 
 const FAILURES: Record<BreachFailure, string> = {
-  offline: "The check couldn't reach Have I Been Pwned. You may be offline. Try again when you're connected.",
-  timeout: "Have I Been Pwned took too long to answer. Try again in a moment.",
+  offline: "Couldn't reach Have I Been Pwned. Check your connection and try again.",
+  timeout: "Have I Been Pwned didn't answer in time. Try again.",
   http: "Have I Been Pwned didn't send a usable answer. Try again later.",
   unsupported: "This browser can't run the breach check privately.",
   busy: "A check is already running.",
@@ -35,6 +35,10 @@ export class Checker {
   private readonly hint: HTMLElement;
   private readonly breachButton: HTMLButtonElement;
   private readonly breachResult: HTMLElement;
+  /** The note beside the button: what a check will send, then exactly what one did send (R19). */
+  private readonly breachNote: HTMLElement;
+  private readonly breachNoteText: string;
+  private sentPrefix: string | null = null;
   private readonly hintText: string;
   private readonly estimateSoon = debounce(() => this.estimate(), 120);
   private readonly announceStrength = debounce(() => {
@@ -54,6 +58,13 @@ export class Checker {
     this.hintText = this.hint.textContent ?? "";
     this.breachButton = $<HTMLButtonElement>('[data-action="breach"]', panel);
     this.breachResult = $("[data-breach-result]", panel);
+    this.breachNote = $("[data-breach-note]", panel);
+    this.breachNoteText = this.breachNote.textContent ?? "";
+    // The request log is on /how-it-works, so the checker itself says what left the device.
+    onBreachAttempt((attempt) => {
+      this.sentPrefix = attempt.prefix;
+      this.renderNote();
+    });
 
     if (!canCheckBreaches()) $("[data-breach]", panel).hidden = true;
 
@@ -63,6 +74,7 @@ export class Checker {
     }
     this.input.addEventListener("input", () => {
       this.cancelBreachCheck();
+      this.forgetSent();
       this.dispatch({ type: "input", empty: this.input.value === "" });
       this.estimateSoon();
     });
@@ -83,7 +95,18 @@ export class Checker {
     this.estimateSoon.cancel();
     this.announceStrength.cancel();
     this.cancelBreachCheck();
+    this.forgetSent();
     this.dispatch({ type: "clear" });
+  }
+
+  private forgetSent(): void {
+    if (this.sentPrefix === null) return;
+    this.sentPrefix = null;
+    this.renderNote();
+  }
+
+  private renderNote(): void {
+    this.breachNote.textContent = this.sentPrefix ? `Sent only ${this.sentPrefix} to ${new URL(BREACH_API_ORIGIN).host}.` : this.breachNoteText;
   }
 
   private cancelBreachCheck(): void {
@@ -203,10 +226,10 @@ export class Checker {
     this.breachResult.hidden = breach.status === "idle" || breach.status === "checking";
     if (breach.status === "found") {
       this.breachResult.dataset.status = "found";
-      this.breachResult.textContent = `Found ${numberFormat.format(breach.count)} ${breach.count === 1 ? "time" : "times"} in known data breaches. Don't use this password anywhere, and change it wherever you have.`;
+      this.breachResult.textContent = `Found ${numberFormat.format(breach.count)} ${breach.count === 1 ? "time" : "times"} in breaches. Don't use it anywhere.`;
     } else if (breach.status === "not-found") {
       this.breachResult.dataset.status = "not-found";
-      this.breachResult.textContent = "Not found in known breaches. That doesn't make it strong: check the rating above.";
+      this.breachResult.textContent = "Not found in known breaches. That alone doesn't make it strong.";
     } else if (breach.status === "failed") {
       this.breachResult.dataset.status = "failed";
       this.breachResult.textContent = FAILURES[breach.reason];

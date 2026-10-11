@@ -228,12 +228,22 @@
 
 /* ---------- Tool ---------- */
 
-/* The first screen holds the tool and nothing else: the section fills the viewport below the header. */
+/* A tool page is one screen: the header, the tool and a footer pinned to the bottom. The tool sits
+   at the top of the space, so an opened disclosure grows downward instead of moving it. */
+body[data-page="tool"] {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+}
+
+body[data-page="tool"] main {
+  flex: 1 0 auto;
+}
+
 .tool {
   width: min(100% - 2 * var(--gutter), 800px);
-  min-height: calc(100svh - 64px);
   margin-inline: auto;
-  padding-block: clamp(8px, 3vh, 40px);
+  padding-block: clamp(8px, 3vh, 32px);
 }
 
 /* Layers that take turns (the two panels, each mode's options) share one grid cell, so the box is
@@ -553,24 +563,34 @@
   background: repeating-linear-gradient(-45deg, var(--rating) 0 5px, transparent 5px 8px);
 }
 
+/* Every line of the block has a fixed height, so no estimate or mode can move what follows. Wide
+   screens: rating, crack time and the attack-speeds button on one line. Narrow: the rating and the
+   button, then the crack time on a line of its own. A crack time that doesn't fit ends in an
+   ellipsis; the full figures are always under "Attack speeds". */
 .strength__row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-areas: "rating time toggle";
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 2px 16px;
+  gap: 4px 16px;
   margin-top: 10px;
 }
 
 .strength__rating {
   display: flex;
+  grid-area: rating;
   align-items: baseline;
   gap: 10px;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .strength__label {
+  min-width: 0;
+  overflow: hidden;
   color: var(--rating);
   font-weight: 650;
+  text-overflow: ellipsis;
 }
 
 .strength[data-empty] .strength__label,
@@ -580,45 +600,21 @@
 }
 
 .strength__bits {
+  flex: none;
   color: var(--ink-3);
   font-size: 0.9375rem;
   font-variant-numeric: tabular-nums;
 }
 
 .strength__time {
+  grid-area: time;
+  min-width: 0;
+  overflow: hidden;
   color: var(--ink-2);
   font-size: 0.9375rem;
-}
-
-/* The crack time can never change the block's height: one line beside the rating on wide screens,
-   exactly two of its own on narrow ones. The full figures are always in "Other attack speeds". */
-@media (min-width: 700px) {
-  .strength__row {
-    flex-wrap: nowrap;
-  }
-
-  .strength__rating {
-    flex: none;
-  }
-
-  .strength__time {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-
-@media (max-width: 699px) {
-  .strength__time {
-    display: -webkit-box;
-    flex-basis: 100%;
-    height: 2lh;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-  }
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .strength__time strong {
@@ -627,12 +623,31 @@
 }
 
 .strength__toggle {
-  margin-top: 6px;
+  grid-area: toggle;
+  white-space: nowrap;
 }
 
+@media (max-width: 699px) {
+  .strength__row {
+    grid-template-areas:
+      "rating toggle"
+      "time time";
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .strength__time {
+    font-size: 0.875rem;
+    text-align: left;
+  }
+}
+
+/* Capped so it never runs past the bottom of the screen and makes a one-screen page scroll. */
 .crack {
   top: calc(100% + 6px);
+  max-height: min(40svh, 320px);
   padding: 10px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .crack__row {
@@ -1099,15 +1114,22 @@
   right: 8px;
 }
 
-.feedback {
+/* The breach result and the suggestions share one fixed area, result first, so nothing they say
+   can move the breach check below them or push a one-screen page past the screen. */
+.check-notes {
   display: grid;
-  gap: 8px;
-  margin-top: 12px;
-  list-style: none;
+  align-content: start;
+  gap: 6px;
+  height: 5rem;
+  margin-top: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-.feedback:empty {
-  display: none;
+.feedback {
+  display: grid;
+  gap: 6px;
+  list-style: none;
 }
 
 .feedback li {
@@ -1161,24 +1183,25 @@
   line-height: 1.5;
 }
 
-.breach-box__result {
-  grid-column: 1 / -1;
-  padding: 10px 12px;
+.breach-result {
+  padding: 6px 10px;
   border-radius: var(--r-sm);
-  background: var(--surface);
-  font-size: 0.9375rem;
-  line-height: 1.5;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 0.875rem;
+  line-height: 1.45;
 }
 
-.breach-box__result[data-status="found"] {
+.breach-result[data-status="found"] {
   border-left: 4px solid var(--rating-very-weak);
+  font-weight: 550;
 }
 
-.breach-box__result[data-status="not-found"] {
+.breach-result[data-status="not-found"] {
   border-left: 4px solid var(--rating-strong);
 }
 
-.breach-box__result[data-status="failed"] {
+.breach-result[data-status="failed"] {
   border-left: 4px solid var(--rating-fair);
 }
 
@@ -1218,6 +1241,57 @@
   opacity: 0.6;
 }
 
+/* ---------- Short screens ---------- */
+
+/* Below 780px of height (a 375x667 phone, a 1280x720 laptop) the tool tightens so the page still
+   fits one screen with the footer in view. */
+@media (max-height: 780px) {
+  .tool {
+    padding-block: 8px;
+  }
+
+  .breach-box {
+    margin-top: 12px;
+    padding: 12px;
+  }
+
+  .check-notes {
+    height: 4.5rem;
+  }
+
+  .vault {
+    padding: 12px;
+  }
+
+  .panel {
+    margin-top: 10px;
+  }
+
+  .secret__frame {
+    height: 4.25rem;
+  }
+
+  .secret__actions {
+    margin-top: 8px;
+  }
+
+  .strength {
+    margin-top: 10px;
+  }
+
+  .opts {
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+}
+
+/* The very shortest screens (a 360x640 phone) take the last few pixels from the tool padding. */
+@media (max-height: 660px) {
+  .tool {
+    padding-block: 2px;
+  }
+}
+
 /* ---------- Small screens ---------- */
 
 @media (max-width: 459px) {
@@ -1226,8 +1300,30 @@
     gap: 8px;
   }
 
-  .tool {
-    min-height: calc(100svh - 56px);
+  /* Room for the whole tool on a 375x667 phone: one row each of character sets, separators and
+     switches. */
+  .sets__chips,
+  .seps__options {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
+  .sets__chips .chip,
+  .seps__options .chip {
+    flex: 1 1 0;
+  }
+
+  .sets__chips .chip span:not(.sr-only),
+  .seps__options .chip span:not(.sr-only) {
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    padding: 0 4px;
+  }
+
+  .toggles {
+    gap: 8px 20px;
+    margin-top: 12px;
   }
 
   .brand__name {
