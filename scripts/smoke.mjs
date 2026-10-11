@@ -8,7 +8,8 @@
 
 const ORIGIN = (process.env.SMOKE_ORIGIN ?? "https://securepass.dev").replace(/\/$/, "");
 const LIVE = ORIGIN === "https://securepass.dev";
-const INJECTED = ["cloudflareinsights", "rocket-loader", "email-decode", "challenge-platform"];
+// The pages never reference /cdn-cgi/, so any mention is something Cloudflare added.
+const INJECTED = ["cloudflareinsights", "rocket-loader", "email-decode", "challenge-platform", "/cdn-cgi/"];
 // Cloudflare rewrites only what it takes for a browser's page load, so pages are fetched as one.
 const AS_BROWSER = {
   headers: {
@@ -62,10 +63,12 @@ const sitemap = await get(`${ORIGIN}/sitemap.xml`);
 check((sitemap.headers.get("content-type") ?? "").includes("xml"), "sitemap.xml is served as XML");
 check((await (await get(`${ORIGIN}/.well-known/security.txt`)).text()).includes("Contact:"), "security.txt is served");
 check((await get(`${ORIGIN}/sw.js`)).headers.get("cache-control") === cacheControlFor("/sw.js"), "sw.js is never cached");
-// Pages opt out of Cloudflare's rewriting, which also opts them out of compression; scripts must not.
-const script = (await (await get(`${ORIGIN}/`, AS_BROWSER)).text()).match(//assets/main-[w-]+.js/)?.[0];
-const encoding = script ? (await get(`${ORIGIN}${script}`, { headers: { "Accept-Encoding": "br, gzip" } })).headers.get("content-encoding") : null;
-check(Boolean(encoding), `the main script is served compressed (got ${encoding})`);
+if (LIVE) {
+  // Pages opt out of Cloudflare's rewriting, which also opts them out of compression; scripts must not.
+  const script = (await (await get(`${ORIGIN}/`, AS_BROWSER)).text()).match(/\/assets\/main-[\w-]+\.js/)?.[0];
+  const encoding = script ? (await get(`${ORIGIN}${script}`, { headers: { "Accept-Encoding": "br, gzip" } })).headers.get("content-encoding") : null;
+  check(Boolean(encoding), `the main script is served compressed (got ${encoding})`);
+}
 check((await get(`${ORIGIN}/og/password.png`)).status === 200, "the preview image is served");
 
 if (LIVE) {
