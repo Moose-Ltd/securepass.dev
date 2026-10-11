@@ -25,6 +25,9 @@ export interface PasswordOptions {
   exclude: string;
 }
 
+/** Longest exclusion list the options accept. */
+export const MAX_EXCLUDE_LENGTH = 64;
+
 export const PASSWORD_LIMITS = Object.freeze({ min: 8, max: 128, default: 20 } as const);
 
 // Frozen so shared defaults can't be mutated by accident: copy before changing.

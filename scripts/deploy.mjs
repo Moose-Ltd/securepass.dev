@@ -15,8 +15,9 @@ import { fileURLToPath } from "node:url";
 import { DEPLOY_TOKEN, TOKEN_VERIFY_URL, WRANGLER_HOME, deployToken, loginProblem, tokenProblem, wranglerEnv, wranglerFlags } from "./lib/account.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const wranglerBin = path.join(path.dirname(createRequire(import.meta.url).resolve("wrangler/package.json")), "bin", "wrangler.js");
-const viteBin = path.join(path.dirname(createRequire(import.meta.url).resolve("vite/package.json")), "bin", "vite.js");
+const require = createRequire(import.meta.url);
+const wranglerBin = path.join(path.dirname(require.resolve("wrangler/package.json")), "bin", "wrangler.js");
+const viteBin = path.join(path.dirname(require.resolve("vite/package.json")), "bin", "vite.js");
 const env = wranglerEnv(process.env, os.homedir(), existsSync(path.join(os.homedir(), WRANGLER_HOME)));
 const wranglerCli = (...args) => [wranglerBin, ...args, ...wranglerFlags(os.devNull)];
 

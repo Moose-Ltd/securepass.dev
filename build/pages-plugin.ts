@@ -32,7 +32,7 @@ export function pagesPlugin(root: string): Plugin {
         if (!stub) return html;
         const id = STUB_IDS[stub[1] ?? ""];
         if (!id) throw new Error(`pages-plugin: unknown page stub ${stub[1]}`);
-        return renderPage(id).replace("{{RANDOM_INT_SOURCE}}", esc(randomIntSource(root)));
+        return renderPage(id).replace("{{RANDOM_INT_SOURCE}}", () => esc(randomIntSource(root)));
       },
     },
   };

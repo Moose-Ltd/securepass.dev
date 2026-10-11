@@ -3,7 +3,7 @@
 // chunk that pages never download until someone uses the checker.
 
 import type { MatchExtended, TimeEstimationValues, ZxcvbnFactory } from "@zxcvbn-ts/core";
-import { charClass, type CharsetId } from "../core/charsets.ts";
+import { CHARSETS, charClass, type CharsetId } from "../core/charsets.ts";
 import { crackTimesFromGuesses } from "../core/crack-time.ts";
 import { RATING_ORDER, ratingFromBits, type Rating } from "../core/rating.ts";
 import { SCENARIO_BY_ID, type ScenarioId } from "../core/scenarios.ts";
@@ -42,7 +42,13 @@ export const FALLBACK_SUGGESTION = "Use 15 or more characters, or a passphrase o
 // own generated password Fair while the generator says Excellent.
 const RANDOM_MIN_CHARS = 12;
 const RANDOM_MIN_CLASSES = 3;
-const CLASS_SIZES: Readonly<Record<CharsetId, number>> = { upper: 26, lower: 26, digits: 10, symbols: 33 };
+const CLASS_SIZES: Readonly<Record<CharsetId, number>> = {
+  upper: CHARSETS.upper.length,
+  lower: CHARSETS.lower.length,
+  digits: CHARSETS.digits.length,
+  // charClass also files the space (and anything outside printable ASCII) under symbols.
+  symbols: CHARSETS.symbols.length + 1,
+};
 
 /**
  * log10 of the guesses after the random-run adjustment. When the brute-force runs together

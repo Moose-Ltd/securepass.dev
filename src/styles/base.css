@@ -199,3 +199,8 @@ button:disabled {
   background: var(--bg-sunk);
   color: var(--ink);
 }
+
+/* Code inside a block keeps the block's size instead of shrinking a second time. */
+pre code {
+  font-size: inherit;
+}

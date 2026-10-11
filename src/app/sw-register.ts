@@ -1,6 +1,8 @@
 // Registers the offline service worker (R20) through the page's single Trusted Types policy, and
 // offers a reload when a new version is waiting (R42).
 
+import { SW_URL, TRUSTED_TYPES_POLICY } from "../security/constants.ts";
+
 interface TrustedScriptURLPolicy {
   createScriptURL(input: string): string;
 }
@@ -11,14 +13,13 @@ declare global {
   }
 }
 
-const SW_URL = "/sw.js";
 
 /**
  * The only Trusted Types policy on the page. It admits exactly one script URL; anything else
  * throws. The CSP names it (`trusted-types securepass`), so no other policy can be created.
  */
 function scriptUrl(): string {
-  const policy = window.trustedTypes?.createPolicy("securepass", {
+  const policy = window.trustedTypes?.createPolicy(TRUSTED_TYPES_POLICY, {
     createScriptURL(input: string) {
       if (input === SW_URL) return input;
       throw new TypeError(`Blocked script URL: ${input}`);

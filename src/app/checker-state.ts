@@ -37,6 +37,8 @@ export function checkerReducer(state: CheckerState, event: CheckerEvent): Checke
     case "breach-result":
       return event.revision === state.revision && state.breach.status === "checking" ? { ...state, breach: event.result } : state;
     case "clear":
+      // Already clear: return the same state so nothing re-renders.
+      if (state.empty && !state.estimate && state.breach.status === "idle") return state;
       return { ...initialCheckerState, revision: state.revision + 1 };
   }
 }

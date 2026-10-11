@@ -6,20 +6,21 @@ import { crackTimesFromBits, formatDuration } from "../core/crack-time.ts";
 import { generatePassphrase, type Separator } from "../core/passphrase.ts";
 import { canDisableSet, generatePassword } from "../core/password.ts";
 import { generatePin } from "../core/pin.ts";
-import { hasSecureRandom } from "../core/random.ts";
+import { clampInteger, hasSecureRandom } from "../core/random.ts";
 import { ratingFromBits } from "../core/rating.ts";
 import { loadWordlist } from "../core/wordlist.ts";
 import { announce } from "./announcer.ts";
 import { copySecret, copyShortcutHint } from "./copy.ts";
-import { $, $$, debounce } from "./dom.ts";
+import { $, $$, debounce, el } from "./dom.ts";
 import { savePrefs, type Prefs } from "./prefs.ts";
 import { SecretDisplay } from "./secret-display.ts";
 import { StrengthBlock, headlineSentence } from "./strength-ui.ts";
-
-export type GeneratorMode = "password" | "passphrase" | "pin";
+import type { GeneratorMode } from "../pages/routes.ts";
 
 const SET_NAMES: Record<CharsetId, string> = { upper: "Capital letters", lower: "Lower-case letters", digits: "Digits", symbols: "Symbols" };
 const NOUNS: Record<GeneratorMode, string> = { password: "password", passphrase: "passphrase", pin: "PIN" };
+
+type RangeKey = "length" | "words" | "digits";
 
 export class Generator {
   private mode: GeneratorMode = "password";
@@ -29,6 +30,9 @@ export class Generator {
   private readonly copyLabel: HTMLElement;
   private readonly copyHint: HTMLElement;
   private readonly spell: HTMLOListElement;
+  private readonly secret: HTMLElement;
+  /** Each range control's preference, read and written by key. */
+  private readonly ranges: Record<RangeKey, { get(): number; set(value: number): void }>;
   private wordlist: readonly string[] | null = null;
   private frame = 0;
   private copyReset: ReturnType<typeof setTimeout> | undefined;
@@ -43,7 +47,14 @@ export class Generator {
     private readonly prefs: Prefs,
   ) {
     this.spell = $<HTMLOListElement>("[data-spell]", panel);
-    this.display = new SecretDisplay($("[data-secret-value]", panel), this.spell);
+    this.secret = $("[data-secret-value]", panel);
+    this.display = new SecretDisplay(this.secret, this.spell);
+    const { password, passphrase, pin } = prefs;
+    this.ranges = {
+      length: { get: () => password.length, set: (v) => (password.length = v) },
+      words: { get: () => passphrase.words, set: (v) => (passphrase.words = v) },
+      digits: { get: () => pin.digits, set: (v) => (pin.digits = v) },
+    };
     this.strength = new StrengthBlock($('[data-strength="gen"]', panel));
     this.buttons = {
       hide: $<HTMLButtonElement>('[data-action="hide"]', panel),
@@ -64,7 +75,7 @@ export class Generator {
     this.mode = mode;
     for (const fieldset of $$("[data-options]", this.panel)) fieldset.hidden = fieldset.dataset.options !== mode;
     $("[data-pin-badge]", this.panel).hidden = mode !== "pin";
-    $("[data-secret-value]", this.panel).setAttribute("aria-label", `Generated ${NOUNS[mode]}`);
+    this.secret.setAttribute("aria-label", `Generated ${NOUNS[mode]}`);
     this.closeSpell();
     await this.generate();
   }
@@ -107,8 +118,7 @@ export class Generator {
     const crackSeconds = crackTimesFromBits(bits);
     if (this.mode === "pin") {
       // PINs get a neutral treatment: they are only meant for places that limit wrong guesses (R6, R9).
-      const throttled = document.createElement("strong");
-      throttled.textContent = formatDuration(crackSeconds["online-throttled"]);
+      const throttled = el("strong", { text: formatDuration(crackSeconds["online-throttled"]) });
       this.strength.render({
         rating: null,
         level: Math.min(5, Math.max(1, Math.ceil(bits / 10))),
@@ -146,6 +156,7 @@ export class Generator {
       const open = spell.getAttribute("aria-expanded") !== "true";
       spell.setAttribute("aria-expanded", String(open));
       this.spell.hidden = !open;
+      this.display.setSpellOpen(open);
     });
 
     // Shortcuts work only while focus is inside the tool and never while typing (R41, WCAG 2.1.4).
@@ -169,12 +180,13 @@ export class Generator {
   private closeSpell(): void {
     this.buttons.spell.setAttribute("aria-expanded", "false");
     this.spell.hidden = true;
+    this.display.setSpellOpen(false);
   }
 
   private async copy(): Promise<void> {
     const value = this.display.current;
     if (!value) return;
-    const outcome = await copySecret(value, $("[data-secret-value]", this.panel));
+    const outcome = await copySecret(value, this.secret);
     if (outcome === "copied") {
       this.buttons.copy.dataset.copied = "";
       this.copyLabel.textContent = "Copied";
@@ -208,25 +220,20 @@ export class Generator {
   }
 
   private bindOptions(): void {
-    const { password, passphrase, pin } = this.prefs;
-    const ranges: Record<string, { get(): number; set(v: number): void }> = {
-      length: { get: () => password.length, set: (v) => (password.length = v) },
-      words: { get: () => passphrase.words, set: (v) => (passphrase.words = v) },
-      digits: { get: () => pin.digits, set: (v) => (pin.digits = v) },
-    };
+    const { password, passphrase } = this.prefs;
 
     for (const wrapper of $$("[data-range]", this.panel)) {
-      const key = wrapper.dataset.range!;
-      const binding = ranges[key]!;
+      const binding = this.ranges[wrapper.dataset.range as RangeKey];
       const slider = $<HTMLInputElement>("[data-opt]", wrapper);
       const number = $<HTMLInputElement>("[data-opt-num]", wrapper);
-      const min = Number(slider.min);
-      const max = Number(slider.max);
+      const limits = { min: Number(slider.min), max: Number(slider.max) };
       const commit = (raw: number) => {
-        const value = Math.min(max, Math.max(min, Math.round(Number.isFinite(raw) ? raw : binding.get())));
+        const value = clampInteger(raw, { ...limits, default: binding.get() });
+        const unchanged = value === binding.get();
         binding.set(value);
+        // Always resync: the number field may hold a typed value that was clamped.
         this.syncRange(wrapper);
-        this.changed();
+        if (!unchanged) this.changed();
       };
       slider.addEventListener("input", () => commit(slider.valueAsNumber));
       number.addEventListener("change", () => commit(number.valueAsNumber));
@@ -293,8 +300,7 @@ export class Generator {
   }
 
   private syncRange(wrapper: HTMLElement): void {
-    const key = wrapper.dataset.range!;
-    const value = key === "length" ? this.prefs.password.length : key === "words" ? this.prefs.passphrase.words : this.prefs.pin.digits;
+    const value = this.ranges[wrapper.dataset.range as RangeKey].get();
     const slider = $<HTMLInputElement>("[data-opt]", wrapper);
     const number = $<HTMLInputElement>("[data-opt-num]", wrapper);
     slider.value = String(value);

@@ -2,9 +2,10 @@
 // stored. Everything read back is validated and clamped, and blocked or corrupt storage falls back
 // to defaults silently (R39, R40).
 
-import { CHARSET_IDS, DEFAULT_PASSWORD_OPTIONS, PASSWORD_LIMITS, type CharsetId, type PasswordOptions } from "../core/charsets.ts";
+import { CHARSET_IDS, DEFAULT_PASSWORD_OPTIONS, MAX_EXCLUDE_LENGTH, PASSWORD_LIMITS, type CharsetId, type PasswordOptions } from "../core/charsets.ts";
 import { DEFAULT_PASSPHRASE_OPTIONS, PASSPHRASE_LIMITS, SEPARATORS, type PassphraseOptions, type Separator } from "../core/passphrase.ts";
 import { PIN_LIMITS } from "../core/pin.ts";
+import { clampInteger } from "../core/random.ts";
 
 export const PREFS_KEY = "securepass:prefs:v1";
 
@@ -14,8 +15,6 @@ export interface Prefs {
   pin: { digits: number };
 }
 
-const MAX_EXCLUDE = 64;
-
 export function defaultPrefs(): Prefs {
   return {
     password: { ...DEFAULT_PASSWORD_OPTIONS, sets: { ...DEFAULT_PASSWORD_OPTIONS.sets } },
@@ -24,9 +23,9 @@ export function defaultPrefs(): Prefs {
   };
 }
 
+/** A stored number clamped into range; anything that isn't a number keeps the current value. */
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
-  return Math.min(max, Math.max(min, Math.round(value)));
+  return typeof value === "number" ? clampInteger(value, { min, max, default: fallback }) : fallback;
 }
 
 function bool(value: unknown, fallback: boolean): boolean {
@@ -43,7 +42,7 @@ export function sanitizePrefs(raw: unknown): Prefs {
     const p = prefs.password;
     p.length = clampInt(password.length, PASSWORD_LIMITS.min, PASSWORD_LIMITS.max, p.length);
     p.avoidAmbiguous = bool(password.avoidAmbiguous, p.avoidAmbiguous);
-    if (typeof password.exclude === "string") p.exclude = password.exclude.slice(0, MAX_EXCLUDE);
+    if (typeof password.exclude === "string") p.exclude = password.exclude.slice(0, MAX_EXCLUDE_LENGTH);
     const sets = password.sets as Record<string, unknown> | undefined;
     if (sets && typeof sets === "object") {
       for (const id of CHARSET_IDS) p.sets[id] = bool(sets[id], p.sets[id]);

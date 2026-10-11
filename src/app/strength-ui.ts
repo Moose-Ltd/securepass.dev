@@ -4,7 +4,7 @@
 import { formatDuration } from "../core/crack-time.ts";
 import { RATING_LABELS, type Rating } from "../core/rating.ts";
 import { HEADLINE_SCENARIO, SCENARIOS, type ScenarioId } from "../core/scenarios.ts";
-import { $, $$ } from "./dom.ts";
+import { $, $$, el } from "./dom.ts";
 
 const LEVELS: Record<Rating, number> = { "very-weak": 1, weak: 2, fair: 3, strong: 4, excellent: 5, compromised: 5 };
 
@@ -22,8 +22,7 @@ export interface StrengthView {
 
 export function headlineSentence(seconds: number): (string | Node)[] {
   const formatted = formatDuration(seconds);
-  const strong = document.createElement("strong");
-  strong.textContent = formatted;
+  const strong = el("strong", { text: formatted });
   return formatted === "instantly" ? ["Could be cracked ", strong] : ["Would take ", strong, " to crack"];
 }
 
@@ -34,6 +33,8 @@ export class StrengthBlock {
   private readonly time: HTMLElement;
   private readonly toggle: HTMLButtonElement;
   private readonly details: HTMLElement;
+  /** The per-scenario time cells, found once. */
+  private readonly cells: Map<ScenarioId, HTMLElement>;
   private readonly emptyLabel: string;
   private readonly emptyTime: string;
 
@@ -46,6 +47,9 @@ export class StrengthBlock {
     this.details = $(`#${this.toggle.getAttribute("aria-controls")}`);
     this.emptyLabel = this.label.textContent ?? "";
     this.emptyTime = this.time.textContent ?? "";
+    this.cells = new Map(
+      $$("[data-scenario]", this.details).map((row) => [row.dataset.scenario as ScenarioId, $("[data-scenario-time]", row)]),
+    );
     this.toggle.addEventListener("click", () => {
       const open = this.toggle.getAttribute("aria-expanded") !== "true";
       this.toggle.setAttribute("aria-expanded", String(open));
@@ -66,7 +70,7 @@ export class StrengthBlock {
     this.bits.textContent = view.bits === undefined ? "" : `${view.bits.toFixed(view.bits < 100 ? 1 : 0)} bits`;
     this.time.replaceChildren(...(view.timeLine ?? headlineSentence(view.crackSeconds[HEADLINE_SCENARIO.id])));
     for (const scenario of SCENARIOS) {
-      const cell = $$("[data-scenario-time]", this.details).find((dd) => dd.closest<HTMLElement>("[data-scenario]")?.dataset.scenario === scenario.id);
+      const cell = this.cells.get(scenario.id);
       if (cell) cell.textContent = formatDuration(view.crackSeconds[scenario.id]);
     }
   }
@@ -79,6 +83,6 @@ export class StrengthBlock {
     this.label.textContent = this.emptyLabel;
     this.bits.textContent = "";
     this.time.textContent = this.emptyTime;
-    for (const dd of $$("[data-scenario-time]", this.details)) dd.textContent = " ";
+    for (const cell of this.cells.values()) cell.textContent = "\u00a0";
   }
 }

@@ -75,7 +75,7 @@ async function lookup(password: string): Promise<BreachResult> {
   }, TIMEOUT_MS);
 
   try {
-    announce({ url, prefix, at: performance.now() });
+    notifyAttempt({ url, prefix, at: performance.now() });
     const response = await fetch(url, {
       method: "GET",
       // Padding hides the true size of the range from anyone watching the wire.
@@ -113,7 +113,7 @@ function matchCount(body: string, suffix: string): number | undefined {
   return sawRow ? 0 : undefined;
 }
 
-function announce(attempt: BreachAttempt): void {
+function notifyAttempt(attempt: BreachAttempt): void {
   for (const listener of [...listeners]) {
     try {
       listener(attempt);

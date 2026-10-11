@@ -8,11 +8,12 @@
 
 const ORIGIN = (process.env.SMOKE_ORIGIN ?? "https://securepass.dev").replace(/\/$/, "");
 const LIVE = ORIGIN === "https://securepass.dev";
-const PAGES = ["/", "/passphrase-generator", "/pin-generator", "/password-strength-checker"];
 const INJECTED = ["cloudflareinsights", "rocket-loader", "email-decode", "challenge-platform"];
 
-// The TypeScript source is the single source of truth; Node strips its types natively.
+// The TypeScript sources are the single source of truth; Node strips their types natively.
 const { SECURITY_HEADERS } = await import("../src/security/headers.ts");
+const { ROUTES, SITE_ORIGIN } = await import("../src/pages/routes.ts");
+const PAGES = ROUTES.map((r) => r.path);
 
 const failures = [];
 const check = (ok, message) => {
@@ -40,7 +41,7 @@ check(missing.status === 404, `unknown path returns 404 (got ${missing.status})`
 check(missingHtml.includes("noindex"), "404 page is noindex");
 
 const robots = await (await get(`${ORIGIN}/robots.txt`)).text();
-check(robots.includes(`Sitemap: https://securepass.dev/sitemap.xml`), "robots.txt names the sitemap");
+check(robots.includes(`Sitemap: ${SITE_ORIGIN}/sitemap.xml`), "robots.txt names the sitemap");
 const sitemap = await get(`${ORIGIN}/sitemap.xml`);
 check((sitemap.headers.get("content-type") ?? "").includes("xml"), "sitemap.xml is served as XML");
 check((await (await get(`${ORIGIN}/.well-known/security.txt`)).text()).includes("Contact:"), "security.txt is served");

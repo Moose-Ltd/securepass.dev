@@ -2,12 +2,13 @@
 // bootstrap in <head> applies a stored override before first paint; this module keeps the control,
 // the attribute and the browser chrome colour in step afterwards.
 
+import { CHROME_COLORS, THEME_STORAGE_KEY as KEY } from "../security/constants.ts";
+
 export type ThemeChoice = "system" | "light" | "dark";
 
-const KEY = "securepass:theme";
 const ORDER: readonly ThemeChoice[] = ["system", "light", "dark"];
-const CHROME = { light: "#f4f6fb", dark: "#0b1130" } as const;
 const LABELS: Record<ThemeChoice, string> = { system: "match system", light: "light", dark: "dark" };
+const nextChoice = (choice: ThemeChoice): ThemeChoice => ORDER[(ORDER.indexOf(choice) + 1) % ORDER.length]!;
 
 function stored(): ThemeChoice {
   try {
@@ -27,19 +28,18 @@ function apply(choice: ThemeChoice, button: HTMLElement): void {
   const metas = document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]');
   metas.forEach((meta, i) => {
     const media = i === 0 ? "light" : "dark";
-    meta.content = choice === "system" ? CHROME[media] : CHROME[choice];
+    meta.content = choice === "system" ? CHROME_COLORS[media] : CHROME_COLORS[choice];
   });
 
-  const next = ORDER[(ORDER.indexOf(choice) + 1) % ORDER.length]!;
   button.dataset.themeChoice = choice;
-  button.setAttribute("aria-label", `Theme: ${LABELS[choice]}. Switch to ${LABELS[next]}`);
+  button.setAttribute("aria-label", `Theme: ${LABELS[choice]}. Switch to ${LABELS[nextChoice(choice)]}`);
 }
 
 export function initTheme(button: HTMLElement): void {
   let choice = stored();
   apply(choice, button);
   button.addEventListener("click", () => {
-    choice = ORDER[(ORDER.indexOf(choice) + 1) % ORDER.length]!;
+    choice = nextChoice(choice);
     try {
       if (choice === "system") localStorage.removeItem(KEY);
       else localStorage.setItem(KEY, choice);

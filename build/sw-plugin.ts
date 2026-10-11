@@ -6,14 +6,12 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import type { Plugin, ResolvedConfig } from "vite";
+import { ROUTES } from "../src/pages/routes.ts";
 
 /** Page files and the clean URL each is served at (html_handling: drop-trailing-slash). */
-const PAGE_URLS: Record<string, string> = {
-  "index.html": "/",
-  "passphrase-generator/index.html": "/passphrase-generator",
-  "pin-generator/index.html": "/pin-generator",
-  "password-strength-checker/index.html": "/password-strength-checker",
-};
+const PAGE_URLS: Record<string, string> = Object.fromEntries(
+  ROUTES.map((r) => [r.path === "/" ? "index.html" : `${r.path.slice(1)}/index.html`, r.path]),
+);
 
 /** Root files worth keeping offline: the install manifest and the icons it and the pages use. */
 const ROOT_FILES = new Set([

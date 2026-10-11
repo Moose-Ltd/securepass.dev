@@ -3,6 +3,9 @@
 
 export type Mode = "password" | "passphrase" | "pin" | "check";
 
+/** The modes that generate a secret. */
+export type GeneratorMode = Exclude<Mode, "check">;
+
 export interface Route {
   mode: Mode;
   path: string;

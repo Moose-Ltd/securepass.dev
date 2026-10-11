@@ -2,6 +2,8 @@
 // assets-only Worker with no script, and _redirects can't match on host, so this tiny Worker owns
 // the www hostname alone. It only runs for www requests.
 
+import { HSTS } from "../../src/security/constants.ts";
+
 export default {
   fetch(request: Request): Response {
     const url = new URL(request.url);
@@ -13,7 +15,7 @@ export default {
       headers: {
         Location: url.toString(),
         "Cache-Control": "public, max-age=86400",
-        "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+        "Strict-Transport-Security": HSTS,
       },
     });
   },

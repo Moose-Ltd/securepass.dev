@@ -34,4 +34,5 @@ export function debounce<A extends unknown[]>(fn: (...args: A) => void, ms: numb
   return wrapped;
 }
 
-export const prefersReducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let reducedMotion: MediaQueryList | undefined;
+export const prefersReducedMotion = () => (reducedMotion ??= window.matchMedia("(prefers-reduced-motion: reduce)")).matches;

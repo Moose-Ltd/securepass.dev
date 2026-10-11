@@ -4,18 +4,17 @@
 
 import { createHash } from "node:crypto";
 import { BREACH_API_ORIGIN } from "../check/breach.ts";
+import { HSTS, SW_URL, THEME_STORAGE_KEY, TRUSTED_TYPES_POLICY } from "./constants.ts";
+
+export { TRUSTED_TYPES_POLICY };
 
 /**
  * The only inline script on any page. It applies a stored theme override before first paint so the
  * page never flashes the wrong theme, and the CSP allows it by hash alone (KTD4).
  */
-export const THEME_BOOTSTRAP =
-  '(function(){try{var t=localStorage.getItem("securepass:theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}})();';
+export const THEME_BOOTSTRAP = `(function(){try{var t=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}})();`;
 
 export const THEME_BOOTSTRAP_HASH = `sha256-${createHash("sha256").update(THEME_BOOTSTRAP, "utf8").digest("base64")}`;
-
-/** The Trusted Types policy name the app creates to register its service worker (KTD5). */
-export const TRUSTED_TYPES_POLICY = "securepass";
 
 interface Directive {
   name: string;
@@ -54,7 +53,7 @@ export const CSP_DIRECTIVES: readonly Directive[] = [
   {
     name: "trusted-types",
     value: TRUSTED_TYPES_POLICY,
-    note: "That policy exists for one job: registering the offline service worker at /sw.js.",
+    note: `That policy exists for one job: registering the offline service worker at ${SW_URL}.`,
   },
 ];
 
@@ -113,7 +112,7 @@ export const SECURITY_HEADERS: readonly Header[] = [
   { name: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY, note: "The policy above." },
   {
     name: "Strict-Transport-Security",
-    value: "max-age=63072000; includeSubDomains; preload",
+    value: HSTS,
     note: "Browsers must use HTTPS for securepass.dev for the next two years.",
   },
   { name: "Referrer-Policy", value: "no-referrer", note: "Never tell another site which page you came from." },
@@ -152,7 +151,7 @@ interface CacheRule {
  */
 export const CACHE_RULES: readonly CacheRule[] = [
   { pattern: "/assets/*", value: "public, max-age=31536000, immutable" },
-  { pattern: "/sw.js", value: "no-cache" },
+  { pattern: SW_URL, value: "no-cache" },
   { pattern: "/og/*", value: "public, max-age=86400" },
 ];
 

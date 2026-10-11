@@ -3,7 +3,12 @@
 // Build-time only.
 
 import { CSP_DIRECTIVES, SECURITY_HEADERS, THEME_BOOTSTRAP } from "../security/headers.ts";
-import { SCENARIOS } from "../core/scenarios.ts";
+import { MAX_EXCLUDE_LENGTH, PASSWORD_LIMITS } from "../core/charsets.ts";
+import { PASSPHRASE_LIMITS } from "../core/passphrase.ts";
+import { PIN_LIMITS } from "../core/pin.ts";
+import { RATING_LABELS } from "../core/rating.ts";
+import { HEADLINE_SCENARIO, SCENARIOS } from "../core/scenarios.ts";
+import { CHROME_COLORS } from "../security/constants.ts";
 import { CREDITS, FAQ, GUIDES } from "./content.ts";
 import { ICONS } from "./icons.ts";
 import { ROUTES, SITE_ORIGIN, canonicalUrl, routeForMode, type Mode, type Route } from "./routes.ts";
@@ -16,11 +21,11 @@ const YEAR = 2026;
 
 /** The rating bands KTD7 defines, shown on the page. A unit test ties them to ratingFromBits. */
 export const RATING_BANDS = [
-  { rating: "very-weak", label: "Very weak", range: "under 45 bits" },
-  { rating: "weak", label: "Weak", range: "45 to 59 bits" },
-  { rating: "fair", label: "Fair", range: "60 to 74 bits" },
-  { rating: "strong", label: "Strong", range: "75 to 99 bits" },
-  { rating: "excellent", label: "Excellent", range: "100 bits or more" },
+  { rating: "very-weak", range: "under 45 bits" },
+  { rating: "weak", range: "45 to 59 bits" },
+  { rating: "fair", range: "60 to 74 bits" },
+  { rating: "strong", range: "75 to 99 bits" },
+  { rating: "excellent", range: "100 bits or more" },
 ] as const;
 
 export function esc(value: string): string {
@@ -39,10 +44,10 @@ function stripTags(htmlFragment: string): string {
 export function renderPage(id: PageId): string {
   const route = id === "not-found" ? undefined : routeForMode(id);
   const mode: Mode = route?.mode ?? "password";
-  const body =
-    id === "not-found"
-      ? renderNotFound()
-      : [renderTool(route!), renderGuide(route!), renderHow(), renderBreach(), renderCrackTime(), renderBestPractice(), renderFaq()].join("\n");
+  const body = route
+    ? [renderTool(route), renderGuide(route), renderHow(), renderBreach(), renderCrackTime(), renderBestPractice(), renderFaq()].join("\n")
+    : renderNotFound();
+  const skip = route ? { target: "tool", label: "the tool" } : { target: "main", label: "content" };
 
   return `<!doctype html>
 <html lang="en" dir="ltr">
@@ -50,7 +55,7 @@ export function renderPage(id: PageId): string {
 ${renderHead(route)}
 </head>
 <body data-mode="${mode}">
-<a class="skip-link" href="#${id === "not-found" ? "main" : "tool"}">Skip to ${id === "not-found" ? "content" : "the tool"}</a>
+<a class="skip-link" href="#${skip.target}">Skip to ${skip.label}</a>
 ${renderHeader(id)}
 <main id="main">
 ${body}
@@ -81,8 +86,8 @@ function renderHead(route: Route | undefined): string {
     `<meta name="robots" content="${route ? "index, follow, max-image-preview:large" : "noindex, follow"}">`,
     canonical ? `<link rel="canonical" href="${canonical}">` : "",
     '<meta name="color-scheme" content="light dark">',
-    '<meta name="theme-color" content="#f4f6fb" media="(prefers-color-scheme: light)">',
-    '<meta name="theme-color" content="#0b1130" media="(prefers-color-scheme: dark)">',
+    `<meta name="theme-color" content="${CHROME_COLORS.light}" media="(prefers-color-scheme: light)">`,
+    `<meta name="theme-color" content="${CHROME_COLORS.dark}" media="(prefers-color-scheme: dark)">`,
     '<meta name="application-name" content="SecurePass">',
     '<meta name="apple-mobile-web-app-title" content="SecurePass">',
     `<meta name="author" content="${AUTHOR.name}">`,
@@ -216,6 +221,8 @@ function modeLink(route: Route, active: Mode): string {
   return `<a class="modes__link" href="${route.path}" data-mode-link="${route.mode}"${current}>${esc(route.tab)}</a>`;
 }
 
+const range = (limits: { min: number; max: number; default: number }) => ({ min: limits.min, max: limits.max, value: limits.default });
+
 function rangeField(opts: { id: string; label: string; min: number; max: number; value: number; unit: string; opt: string }): string {
   return `<div class="range" data-range="${opts.opt}">
         <div class="range__head">
@@ -285,7 +292,7 @@ function renderTool(route: Route): string {
 
       <fieldset class="opts" data-options="password"${show(route.mode === "password")}>
         <legend class="sr-only">Password options</legend>
-        ${rangeField({ id: "pw-length", label: "Length", min: 8, max: 128, value: 20, unit: "characters", opt: "length" })}
+        ${rangeField({ id: "pw-length", label: "Length", ...range(PASSWORD_LIMITS), unit: "characters", opt: "length" })}
         <div class="sets" role="group" aria-labelledby="sets-label">
           <p class="opts__label" id="sets-label">Include</p>
           <div class="sets__chips">
@@ -302,7 +309,7 @@ function renderTool(route: Route): string {
             <label class="switch"><input type="checkbox" role="switch" data-opt="avoidAmbiguous"><span class="switch__track" aria-hidden="true"></span><span>Avoid look-alike characters <span class="switch__eg" translate="no">l 1 I O 0 o</span></span></label>
             <div class="field">
               <label class="field__label" for="pw-exclude">Leave out these characters</label>
-              <input class="field__input" id="pw-exclude" type="text" maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" translate="no" placeholder="For example &lt;&gt;&quot;'" data-opt="exclude">
+              <input class="field__input" id="pw-exclude" type="text" maxlength="${MAX_EXCLUDE_LENGTH}" autocomplete="off" autocapitalize="off" spellcheck="false" translate="no" placeholder="For example &lt;&gt;&quot;'" data-opt="exclude">
               <p class="field__hint">Useful when a site rejects certain symbols.</p>
             </div>
           </div>
@@ -311,7 +318,7 @@ function renderTool(route: Route): string {
 
       <fieldset class="opts" data-options="passphrase"${show(route.mode === "passphrase")}>
         <legend class="sr-only">Passphrase options</legend>
-        ${rangeField({ id: "pp-words", label: "Words", min: 3, max: 12, value: 6, unit: "words", opt: "words" })}
+        ${rangeField({ id: "pp-words", label: "Words", ...range(PASSPHRASE_LIMITS), unit: "words", opt: "words" })}
         <div class="seps" role="radiogroup" aria-labelledby="sep-label">
           <p class="opts__label" id="sep-label">Between words</p>
           <div class="seps__options">
@@ -331,7 +338,7 @@ function renderTool(route: Route): string {
 
       <fieldset class="opts" data-options="pin"${show(route.mode === "pin")}>
         <legend class="sr-only">PIN options</legend>
-        ${rangeField({ id: "pin-digits", label: "Digits", min: 4, max: 12, value: 6, unit: "digits", opt: "digits" })}
+        ${rangeField({ id: "pin-digits", label: "Digits", ...range(PIN_LIMITS), unit: "digits", opt: "digits" })}
       </fieldset>
     </div>
 
@@ -500,10 +507,10 @@ function renderBreach(): string {
 
 function renderCrackTime(): string {
   const scenarioRows = SCENARIOS.map(
-    (s) => `<tr${s.id === "offline-fast" ? ' class="is-headline"' : ""}><th scope="row">${esc(s.label)}</th><td>${esc(s.rateLabel)}</td><td>${esc(s.description)} <a href="${esc(s.source)}">Source</a></td></tr>`,
+    (s) => `<tr${s.id === HEADLINE_SCENARIO.id ? ' class="is-headline"' : ""}><th scope="row">${esc(s.label)}</th><td>${esc(s.rateLabel)}</td><td>${esc(s.description)} <a href="${esc(s.source)}">Source</a></td></tr>`,
   ).join("\n          ");
   const bands = RATING_BANDS.map(
-    (b) => `<li class="bands__item" data-rating="${b.rating}"><span class="bands__swatch" aria-hidden="true"></span><span class="bands__label">${b.label}</span><span class="bands__range">${b.range}</span></li>`,
+    (b) => `<li class="bands__item" data-rating="${b.rating}"><span class="bands__swatch" aria-hidden="true"></span><span class="bands__label">${RATING_LABELS[b.rating]}</span><span class="bands__range">${b.range}</span></li>`,
   ).join("\n          ");
   return `<section class="crack-time" id="crack-time" aria-labelledby="crack-time-title">
   <div class="container">

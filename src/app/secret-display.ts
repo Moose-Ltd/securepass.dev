@@ -2,7 +2,8 @@
 // mask (R43) and a spell-out list. The display carries translate="no" in the markup so browser
 // translation never sends it anywhere or rewrites passphrase words (R16).
 
-import { charClass } from "../core/charsets.ts";
+import { charClass, type CharsetId } from "../core/charsets.ts";
+import type { GeneratorMode } from "../pages/routes.ts";
 import { el, prefersReducedMotion } from "./dom.ts";
 
 const MASK = "•".repeat(16);
@@ -56,12 +57,14 @@ export function characterName(ch: string): string {
   }
 }
 
-export type SecretKind = "password" | "passphrase" | "pin";
+/** Classes that get their own colour and weight; letters stay in the ink colour. */
+const CLASS_FOR: Partial<Record<CharsetId, string>> = { digits: "c-digit", symbols: "c-symbol" };
 
 export class SecretDisplay {
   private value = "";
-  private kind: SecretKind = "password";
+  private kind: GeneratorMode = "password";
   private hidden = false;
+  private spellOpen = false;
 
   constructor(
     private readonly output: HTMLElement,
@@ -76,12 +79,12 @@ export class SecretDisplay {
     return this.hidden;
   }
 
-  show(value: string, kind: SecretKind): void {
+  show(value: string, kind: GeneratorMode): void {
     this.value = value;
     this.kind = kind;
     this.output.dataset.kind = kind;
     this.render();
-    this.renderSpell();
+    if (this.spellOpen) this.renderSpell();
     if (!prefersReducedMotion()) {
       this.output.classList.remove("is-new");
       // Restart the reveal animation on the next frame.
@@ -96,6 +99,13 @@ export class SecretDisplay {
     this.output.removeAttribute("data-long");
     this.output.replaceChildren(el("span", { className: "secret__placeholder", text }));
     this.spell.replaceChildren();
+  }
+
+  /** The spell-out list exists only while open, so the secret never lingers in a hidden list. */
+  setSpellOpen(open: boolean): void {
+    this.spellOpen = open;
+    if (open) this.renderSpell();
+    else this.spell.replaceChildren();
   }
 
   setHidden(hidden: boolean): void {
@@ -123,7 +133,7 @@ export class SecretDisplay {
     };
     for (const ch of this.value) {
       const kind = charClass(ch);
-      const cls = this.kind === "pin" ? "" : kind === "digits" ? "c-digit" : kind === "symbols" ? "c-symbol" : "";
+      const cls = this.kind === "pin" ? "" : (CLASS_FOR[kind] ?? "");
       if (cls !== runClass) {
         flush();
         runClass = cls;

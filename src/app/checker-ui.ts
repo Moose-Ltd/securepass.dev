@@ -3,14 +3,12 @@
 // leaves the mode or the page (R36).
 
 import { canCheckBreaches, checkBreach, type BreachFailure } from "../check/breach.ts";
-import type { Estimate } from "../check/estimator.ts";
+import type { Estimator } from "../check/estimator.ts";
 import { RATING_LABELS } from "../core/rating.ts";
 import { announce } from "./announcer.ts";
 import { checkerReducer, displayedRating, initialCheckerState, type CheckerEvent, type CheckerState } from "./checker-state.ts";
 import { $, debounce, el } from "./dom.ts";
 import { StrengthBlock } from "./strength-ui.ts";
-
-type Estimator = (password: string) => Estimate;
 
 const FAILURES: Record<BreachFailure, string> = {
   offline: "The check couldn't reach Have I Been Pwned. You may be offline. Try again when you're connected.",
@@ -131,7 +129,9 @@ export class Checker {
   }
 
   private dispatch(event: CheckerEvent): void {
-    this.state = checkerReducer(this.state, event);
+    const next = checkerReducer(this.state, event);
+    if (next === this.state) return;
+    this.state = next;
     this.render();
   }
 
@@ -164,7 +164,7 @@ export class Checker {
       this.strength.render({
         rating,
         crackSeconds: estimate.crackSeconds,
-        ...(rating === "compromised" ? { label: "Compromised", timeLine: ["Found in a data breach, so attackers will try it first."] } : {}),
+        ...(rating === "compromised" ? { timeLine: ["Found in a data breach, so attackers will try it first."] } : {}),
       });
       const items: HTMLLIElement[] = [];
       if (estimate.warning) items.push(el("li", { text: estimate.warning, attrs: { "data-kind": "warning" } }));

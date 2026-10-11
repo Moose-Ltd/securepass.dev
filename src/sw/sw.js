@@ -6,6 +6,7 @@
 const VERSION = "__SP_VERSION__";
 const PRECACHE = __SP_PRECACHE__;
 const CACHE = `securepass-${VERSION}`;
+const PRECACHED = new Set(PRECACHE);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)));
@@ -34,7 +35,7 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(networkFirst(request, url));
-  } else if (PRECACHE.includes(url.pathname)) {
+  } else if (PRECACHED.has(url.pathname)) {
     event.respondWith(cacheFirst(request));
   }
 });
