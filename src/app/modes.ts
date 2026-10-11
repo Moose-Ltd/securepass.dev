@@ -15,7 +15,6 @@ export function initModes(apply: (mode: Mode) => Promise<void> | void): void {
     document.body.dataset.mode = mode;
     document.title = route.title;
     $("[data-page-title]").textContent = route.h1;
-    $("[data-page-lede]").textContent = route.lede;
     $<HTMLLinkElement>('link[rel="canonical"]').href = canonicalUrl(route);
     $<HTMLMetaElement>('meta[name="description"]').content = route.description;
     for (const link of $$<HTMLAnchorElement>("[data-mode-link]")) {

@@ -243,16 +243,16 @@ function strengthBlock(scope: "gen" | "check"): string {
         <div class="meter" data-meter aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
         <div class="strength__row">
           <p class="strength__rating"><span class="strength__label" data-rating-label>${scope === "check" ? "Waiting for a password" : "Calculating"}</span><span class="strength__bits" data-bits></span></p>
-          <p class="strength__time" data-time-line>${scope === "check" ? "Type or paste a password to see how long it would last." : "&nbsp;"}</p>
+          <p class="strength__time" data-time-line>${scope === "check" ? "Type a password to rate it." : "&nbsp;"}</p>
         </div>
-        <button type="button" class="linkbtn strength__toggle" data-action="details" aria-expanded="false" aria-controls="crack-${scope}">How long under other attacks?</button>
+        <button type="button" class="linkbtn strength__toggle" data-action="details" aria-expanded="false" aria-controls="crack-${scope}">Other attack speeds</button>
         <div class="crack" id="crack-${scope}" hidden>
           <dl class="crack__list" data-crack-list>
 ${SCENARIOS.map(
   (s) => `            <div class="crack__row" data-scenario="${s.id}"><dt>${esc(s.label)} <span class="crack__rate">${esc(s.rateLabel)}</span></dt><dd data-scenario-time>&nbsp;</dd></div>`,
 ).join("\n")}
           </dl>
-          <p class="crack__note">Average time to find it, assuming the attacker knows exactly how it was made. <a href="#crack-time">How these are estimated</a>.</p>
+          <p class="crack__note">Average time, if the attacker knows how it was made. <a href="#crack-time">How we estimate</a></p>
         </div>
       </div>`;
 }
@@ -261,22 +261,20 @@ function renderTool(route: Route): string {
   const isCheck = route.mode === "check";
   const show = (cond: boolean) => (cond ? "" : " hidden");
   return `<section class="tool" id="tool" aria-labelledby="page-title">
-  <div class="tool__head">
-    <h1 class="tool__title" id="page-title" tabindex="-1" data-page-title>${esc(route.h1)}</h1>
-    <p class="tool__lede" data-page-lede>${esc(route.lede)}</p>
-  </div>
+  <h1 class="sr-only" id="page-title" tabindex="-1" data-page-title>${esc(route.h1)}</h1>
   <div class="vault" data-vault>
     <nav class="modes" aria-label="Tools">
       ${ROUTES.map((r) => modeLink(r, route.mode)).join("\n      ")}
     </nav>
 
+    <div class="stack">
     <div class="panel panel--generate" data-panel="generate"${show(!isCheck)}>
       <div class="secret" data-secret>
         <div class="secret__frame">
           <output class="secret__value" id="secret" translate="no" data-secret-value aria-label="Generated ${route.mode === "pin" ? "PIN" : route.mode}">
             <span class="secret__placeholder" data-secret-placeholder>Generating on your device&hellip;</span>
           </output>
-          <noscript><p class="secret__notice">SecurePass makes passwords with JavaScript running on your device, so nothing is ever sent to a server. Turn JavaScript on to use the generator.</p></noscript>
+          <noscript><p class="secret__notice">Turn on JavaScript: passwords are made on your device.</p></noscript>
         </div>
         <div class="secret__actions">
           <button type="button" class="iconbtn iconbtn--quiet" data-action="hide" aria-pressed="false" aria-label="Hide" disabled>${ICONS.eye}${ICONS.eyeOff}</button>
@@ -285,11 +283,11 @@ function renderTool(route: Route): string {
           <button type="button" class="btn btn--primary" data-action="copy" disabled>${ICONS.copy}${ICONS.check}<span data-copy-label>Copy</span></button>
         </div>
         <p class="secret__hint" data-copy-hint hidden></p>
+        <ol class="spell" id="spell" translate="no" data-spell hidden></ol>
       </div>
-      <ol class="spell" id="spell" translate="no" data-spell hidden></ol>
       ${strengthBlock("gen")}
-      <p class="pin-badge" data-pin-badge${show(route.mode === "pin")}>${ICONS.info}<span>Only use a PIN where wrong guesses are limited, like a phone or bank card. It can't hold out against an offline attack.</span></p>
 
+      <div class="stack">
       <fieldset class="opts" data-options="password"${show(route.mode === "password")}>
         <legend class="sr-only">Password options</legend>
         ${rangeField({ id: "pw-length", label: "Length", ...range(PASSWORD_LIMITS), unit: "characters", opt: "length" })}
@@ -310,7 +308,7 @@ function renderTool(route: Route): string {
             <div class="field">
               <label class="field__label" for="pw-exclude">Leave out these characters</label>
               <input class="field__input" id="pw-exclude" type="text" maxlength="${MAX_EXCLUDE_LENGTH}" autocomplete="off" autocapitalize="off" spellcheck="false" translate="no" placeholder="For example &lt;&gt;&quot;'" data-opt="exclude">
-              <p class="field__hint">Useful when a site rejects certain symbols.</p>
+              <p class="field__hint">For sites that reject some symbols.</p>
             </div>
           </div>
         </details>
@@ -339,7 +337,9 @@ function renderTool(route: Route): string {
       <fieldset class="opts" data-options="pin"${show(route.mode === "pin")}>
         <legend class="sr-only">PIN options</legend>
         ${rangeField({ id: "pin-digits", label: "Digits", ...range(PIN_LIMITS), unit: "digits", opt: "digits" })}
+        <p class="pin-badge">${ICONS.info}<span>For phones, bank cards and other places that lock after wrong guesses.</span></p>
       </fieldset>
+      </div>
     </div>
 
     <div class="panel panel--check" data-panel="check"${show(isCheck)}>
@@ -349,18 +349,19 @@ function renderTool(route: Route): string {
           <input class="field__input field__input--secret" id="check-input" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" translate="no" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" data-check-input>
           <button type="button" class="iconbtn iconbtn--quiet" data-action="reveal" aria-pressed="false" aria-label="Show password" aria-controls="check-input">${ICONS.eye}${ICONS.eyeOff}</button>
         </div>
-        <p class="field__hint" data-check-hint>Analysed on your device as you type. It is never sent or saved.</p>
+        <p class="field__hint" data-check-hint>Checked on your device. Never sent or saved.</p>
       </div>
       ${strengthBlock("check")}
       <ul class="feedback" data-check-feedback></ul>
       <div class="breach-box" data-breach>
         <div class="breach-box__text">
-          <p class="breach-box__title">Has it been in a data breach?</p>
-          <p class="breach-box__note">Sends only the first 5 characters of the password's SHA-1 hash to Have I Been Pwned. <a href="#breach">How this stays private</a></p>
+          <p class="breach-box__title">Has it leaked in a breach?</p>
+          <p class="breach-box__note">Sends only 5 characters of its hash. <a href="#breach">How</a></p>
         </div>
         <button type="button" class="btn btn--secondary" data-action="breach" disabled>Check breaches</button>
         <p class="breach-box__result" data-breach-result role="status" hidden></p>
       </div>
+    </div>
     </div>
   </div>
 </section>`;
@@ -387,16 +388,15 @@ function renderHow(): string {
   return `<section class="how" id="how" aria-labelledby="how-title">
   <div class="container">
     <header class="section-head">
-      <h2 class="section-head__title" id="how-title">How SecurePass keeps your passwords to yourself</h2>
-      <p class="section-head__lede">There is no server that sees your passwords, because there is no server involved at all. Here is what that means in practice, and how you can check each part yourself.</p>
+      <h2 class="section-head__title" id="how-title">How your passwords stay yours</h2>
+      <p class="section-head__lede">No server ever sees them. You can check every part.</p>
     </header>
 
     <article class="feature" id="randomness" aria-labelledby="randomness-title">
       <div class="feature__text prose">
-        <h3 id="randomness-title">Made by your device, not a server</h3>
-        <p>Every character comes from <code>crypto.getRandomValues</code>, your browser's cryptographically secure random number generator. It is the same source browsers use to create encryption keys.</p>
-        <p>Turning random numbers into characters is where many generators go wrong. Taking a remainder makes some characters slightly more likely than others. SecurePass throws away any number that would cause that bias, so every possible password is exactly as likely as every other.</p>
-        <p>If your browser can't provide secure randomness, SecurePass refuses to generate anything rather than fall back to something weaker.</p>
+        <h3 id="randomness-title">Made on your device</h3>
+        <p>Every character comes from <code>crypto.getRandomValues</code>, the browser's cryptographic random generator.</p>
+        <p>Numbers that would make some characters likelier are thrown away, so every password is equally likely. Without secure randomness, nothing is generated.</p>
       </div>
       <figure class="feature__proof codecard">
         <figcaption class="codecard__caption">The function every character passes through</figcaption>
@@ -406,31 +406,29 @@ function renderHow(): string {
 
     <article class="feature" id="network" aria-labelledby="network-title">
       <div class="feature__text prose">
-        <h3 id="network-title">Nothing is sent, and you can check</h3>
-        <p>SecurePass is a set of static files. Once the page has loaded, generating and checking passwords makes no network requests at all, and the page's security policy would block one if it tried.</p>
-        <p>The counter beside this text watches every request this page makes to another site. It stays at zero unless you run a breach check.</p>
-        <h4>Verify it yourself</h4>
+        <h3 id="network-title">Nothing is sent</h3>
+        <p>Generating and checking make no network requests, and the security policy would block one. The counter tracks every request to another site.</p>
+        <h4>Check it yourself</h4>
         <ol class="steps">
-          <li>Open your browser's developer tools with <kbd>F12</kbd>, or <kbd>Cmd</kbd>&nbsp;<kbd>Option</kbd>&nbsp;<kbd>I</kbd> on a Mac.</li>
+          <li>Open developer tools (<kbd>F12</kbd>, or <kbd>Cmd</kbd>&nbsp;<kbd>Option</kbd>&nbsp;<kbd>I</kbd> on a Mac).</li>
           <li>Choose the <strong>Network</strong> tab.</li>
-          <li>Generate a few passwords and type in the strength checker.</li>
-          <li>Watch the list stay empty.</li>
+          <li>Generate and check passwords. The list stays empty.</li>
         </ol>
-        <p>To go further, turn on airplane mode. After your first visit SecurePass keeps working, because it runs entirely from your device.</p>
+        <p>Or turn on airplane mode: after one visit, it still works.</p>
       </div>
       <div class="feature__proof netcard" data-netcard>
         <p class="netcard__count"><output data-net-count>0</output></p>
         <p class="netcard__label" data-net-label>requests to other sites since you opened this page</p>
         <ol class="netcard__log" data-net-log hidden></ol>
-        <p class="netcard__offline" data-offline-status>Saves itself for offline use after your first visit.</p>
+        <p class="netcard__offline" data-offline-status>Works offline after your first visit.</p>
       </div>
     </article>
 
     <article class="feature" id="headers" aria-labelledby="headers-title">
       <div class="feature__text prose">
         <h3 id="headers-title">Locked down by your browser</h3>
-        <p>Every page arrives with a strict Content Security Policy, which your browser enforces. Even if SecurePass's own code had a bug, the browser would refuse to load scripts from anywhere else, send data to an unknown server, or let another site wrap the page in a frame.</p>
-        <p>This is the exact policy your browser received with this page, and what each rule does.</p>
+        <p>A strict Content Security Policy stops the page loading outside scripts, sending data elsewhere, or being framed, even if its own code had a bug.</p>
+        <p>Here is the exact policy this page arrived with.</p>
       </div>
       <div class="feature__proof policy">
         <dl class="policy__list" aria-label="Content Security Policy directives">
@@ -448,8 +446,8 @@ function renderHow(): string {
     <article class="feature" id="storage" aria-labelledby="storage-title">
       <div class="feature__text prose">
         <h3 id="storage-title">Nothing stored, nothing tracked</h3>
-        <p>No accounts, no cookies, no analytics, no ads and no third-party scripts. SecurePass doesn't know who you are or how you use it, and it has no way to find out.</p>
-        <p>The only thing it remembers is your settings, kept in your browser's local storage so they are there next time. Clearing this site's data removes them.</p>
+        <p>No accounts, cookies, analytics, ads or third-party scripts.</p>
+        <p>Only your settings are remembered, in this browser. Clearing site data removes them.</p>
       </div>
       <div class="feature__proof ledger">
         <div class="ledger__col">
@@ -479,8 +477,8 @@ function renderBreach(): string {
   return `<section class="breach" id="breach" aria-labelledby="breach-title">
   <div class="container">
     <header class="section-head">
-      <h2 class="section-head__title" id="breach-title">A breach check that never reveals your password</h2>
-      <p class="section-head__lede">Have I Been Pwned keeps hundreds of millions of real passwords exposed in data breaches. SecurePass can look yours up without sending it, or even its full fingerprint, using a technique called k-anonymity. It only happens when you press the button.</p>
+      <h2 class="section-head__title" id="breach-title">A breach check that never sees your password</h2>
+      <p class="section-head__lede">Have I Been Pwned holds hundreds of millions of leaked passwords. k-anonymity looks yours up without sending it, and only when you ask.</p>
     </header>
     <ol class="kanon" translate="no">
       <li class="kanon__step">
@@ -488,19 +486,19 @@ function renderBreach(): string {
         <p class="kanon__demo"><span class="kanon__plain">password</span> <span class="kanon__arrow" aria-hidden="true">&rarr;</span> <span class="hash"><span class="hash__sent">5BAA6</span><span class="hash__kept">1E4C9B93F3F0682250B6CF8331B7EE68FD8</span></span></p>
       </li>
       <li class="kanon__step">
-        <p class="kanon__what">Only the first 5 of its 40 characters are sent.</p>
+        <p class="kanon__what">Only the first 5 of 40 characters are sent.</p>
         <p class="kanon__demo"><span class="kanon__url">api.pwnedpasswords.com/range/<span class="hash__sent">5BAA6</span></span></p>
       </li>
       <li class="kanon__step">
-        <p class="kanon__what">The service returns every breached hash starting with those 5, around 800 to 1,000 of them, padded with decoys so even the reply's size gives nothing away.</p>
+        <p class="kanon__what">Every leaked hash starting with those 5 comes back, padded with decoys.</p>
         <p class="kanon__demo kanon__demo--list"><span>0018A45C4D1DEF81644B54AB7F969B88D65:<em>count</em></span><span>00D4F6E8FA6EECAD2A3AA415EEC418D38EC:<em>count</em></span><span>&hellip;</span><span>1E4C9B93F3F0682250B6CF8331B7EE68FD8:<em>count</em></span><span>&hellip;</span></p>
       </li>
       <li class="kanon__step">
-        <p class="kanon__what">Your device looks for the other 35 characters in that list. The service never learns which one, if any, was yours.</p>
+        <p class="kanon__what">Your device looks for the other 35. The service never learns which, if any, was yours.</p>
         <p class="kanon__demo"><span class="hash__kept">1E4C9B93F3F0682250B6CF8331B7EE68FD8</span> <span class="kanon__match">found</span></p>
       </li>
     </ol>
-    <p class="breach__foot">Breach data: <a href="https://haveibeenpwned.com/Passwords">Have I Been Pwned</a>. The request carries no cookies and no referrer, and it is the only request SecurePass's security policy allows to another site.</p>
+    <p class="breach__foot">Data: <a href="https://haveibeenpwned.com/Passwords">Have I Been Pwned</a>. No cookies or referrer are sent, and it is the only other site the policy allows.</p>
   </div>
 </section>`;
 }
@@ -516,15 +514,14 @@ function renderCrackTime(): string {
   <div class="container">
     <header class="section-head">
       <h2 class="section-head__title" id="crack-time-title">How crack time is estimated</h2>
-      <p class="section-head__lede">The headline number assumes a well-equipped attacker, so it never flatters a password.</p>
+      <p class="section-head__lede">The headline assumes a well-equipped attacker, so it never flatters.</p>
     </header>
     <div class="split">
       <div class="prose">
-        <h3>Generated passwords: exact maths</h3>
-        <p>A generated password's strength is exactly the number of passwords your settings could have produced. SecurePass counts them, leaving out any that would be missing a character type you asked for, and reports the result as bits of entropy. Twenty characters from all four sets give about 131 bits; six passphrase words give about 77.5.</p>
-        <p>An attacker who knows exactly how the password was made still has to try, on average, half of the possibilities. The time is that number of guesses divided by the attacker's speed.</p>
-        <h3>Passwords you type: pattern analysis</h3>
-        <p>People don't choose characters at random, so length alone says little. The checker uses zxcvbn to find the dictionary words, names, dates, keyboard runs and substitutions that cracking tools try first, and estimates how many guesses those patterns take. Long, patternless runs are priced as random.</p>
+        <h3>Generated: exact maths</h3>
+        <p>Strength is the number of passwords your settings could produce, in bits: about 131 for 20 characters, 77.5 for six words. Time is half of those guesses at the attacker's speed.</p>
+        <h3>Typed: pattern analysis</h3>
+        <p>zxcvbn finds the words, names, dates, keyboard runs and substitutions cracking tools try first, and counts the guesses they take.</p>
       </div>
       <div>
         <table class="scenarios">
@@ -548,15 +545,15 @@ function renderBestPractice(): string {
   return `<section class="practice" id="best-practice" aria-labelledby="practice-title">
   <div class="container">
     <header class="section-head">
-      <h2 class="section-head__title" id="practice-title">What good password hygiene looks like in 2026</h2>
-      <p class="section-head__lede">Based on <a href="https://pages.nist.gov/800-63-4/sp800-63b.html">NIST SP 800-63B-4</a>, the US government's digital identity guidelines, finalised in 2025.</p>
+      <h2 class="section-head__title" id="practice-title">Good password habits</h2>
+      <p class="section-head__lede">From <a href="https://pages.nist.gov/800-63-4/sp800-63b.html">NIST SP 800-63B-4</a> (2025).</p>
     </header>
     <ul class="practice__list">
-      <li><h3>Length beats complexity</h3><p>Use at least 15 characters for any password that is the only thing protecting an account. Mandatory symbol-and-number rules are out; length and randomness are what count.</p></li>
-      <li><h3>One password per account</h3><p>Reused passwords turn one breach into many. A password manager makes unique passwords effortless.</p></li>
-      <li><h3>Check against breaches</h3><p>Services should reject passwords already exposed in breaches, and so should you. A breached password is the first thing attackers try.</p></li>
-      <li><h3>Change it when there's a reason</h3><p>Forced changes every few months are no longer recommended. Change a password when there is any sign it has been exposed.</p></li>
-      <li><h3>Add a second factor</h3><p>Turn on passkeys or two-factor authentication wherever they are offered. They stop a stolen password from being enough on its own.</p></li>
+      <li><h3>Length beats complexity</h3><p>15 characters or more. Length and randomness count, not symbol rules.</p></li>
+      <li><h3>One per account</h3><p>Reuse turns one breach into many. A password manager makes it easy.</p></li>
+      <li><h3>Check for breaches</h3><p>Leaked passwords are the first ones attackers try.</p></li>
+      <li><h3>Change when there's a reason</h3><p>Not on a schedule: when there's any sign of exposure.</p></li>
+      <li><h3>Add a second factor</h3><p>Passkeys or two-factor sign-in make a stolen password useless on its own.</p></li>
     </ul>
   </div>
 </section>`;
@@ -569,7 +566,7 @@ function renderFaq(): string {
   return `<section class="faq" id="faq" aria-labelledby="faq-title">
   <div class="container">
     <header class="section-head">
-      <h2 class="section-head__title" id="faq-title">Questions, answered plainly</h2>
+      <h2 class="section-head__title" id="faq-title">Questions</h2>
     </header>
     <dl class="faq__list">
       ${items}
@@ -582,7 +579,7 @@ function renderNotFound(): string {
   return `<section class="lost" aria-labelledby="lost-title">
   <div class="container lost__inner">
     <h1 class="lost__title" id="lost-title" tabindex="-1">This page doesn't exist</h1>
-    <p class="lost__text">The address may be mistyped, or the page may have moved. Everything SecurePass does is on these four pages:</p>
+    <p class="lost__text">Everything SecurePass does is on these four pages:</p>
     <ul class="lost__links">
       ${ROUTES.map((r) => `<li><a href="${r.path}">${esc(r.h1)}</a></li>`).join("\n      ")}
     </ul>
@@ -601,7 +598,7 @@ function renderFooter(): string {
         <img class="brand__mark" src="/logo-64.png" width="32" height="32" alt="" loading="lazy">
         <span class="brand__name">SecurePass</span>
       </a>
-      <p class="footer__tagline">Passwords made on your device and never sent anywhere. Free, open source, and private by design.</p>
+      <p class="footer__tagline">Made on your device, never sent. Free and open source.</p>
       <p class="footer__status"><span class="status-dot" aria-hidden="true"></span><span data-offline-status-short>No cookies, no tracking</span></p>
     </div>
     <nav class="footer__nav" aria-label="Footer">

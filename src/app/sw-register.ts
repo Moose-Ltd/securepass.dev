@@ -40,7 +40,7 @@ export function registerServiceWorker(views: { status: HTMLElement[]; shortStatu
   };
 
   if (!("serviceWorker" in navigator)) {
-    setStatus("This browser can't save SecurePass for offline use, so it needs a connection to load.", false);
+    setStatus("This browser can't save SecurePass for offline use.", false);
     return;
   }
 
@@ -80,7 +80,7 @@ export function registerServiceWorker(views: { status: HTMLElement[]; shortStatu
         registration.addEventListener("updatefound", () => watch(registration.installing));
         return navigator.serviceWorker.ready;
       })
-      .then(() => setStatus("Ready to work offline. Turn off your connection and it keeps working.", true, "Ready offline"))
+      .then(() => setStatus("Ready offline. It keeps working without a connection.", true, "Ready offline"))
       .catch(() => setStatus("Offline mode couldn't be set up in this browser.", false));
   });
 }

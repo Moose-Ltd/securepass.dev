@@ -94,3 +94,58 @@ test("hiding the secret masks it and disables spelling it out", async ({ page })
   await page.getByRole("button", { name: "Show" }).click();
   await expect(page.locator("[data-secret-value]")).toHaveText(value);
 });
+
+for (const viewport of [
+  { width: 375, height: 667 },
+  { width: 1366, height: 768 },
+]) {
+  test(`at ${viewport.width}x${viewport.height} the first screen is only the tool, and nothing in it moves the page`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await secret(page);
+    // The tool's height, and where the content below it starts.
+    const layout = () =>
+      page.evaluate(() => {
+        const vault = document.querySelector("[data-vault]")!.getBoundingClientRect();
+        const next = document.querySelector(".guide")!.getBoundingClientRect();
+        return { vault: Math.round(vault.height), next: Math.round(next.top + window.scrollY) };
+      });
+    const start = await layout();
+    expect(start.next, "content below the tool starts below the first screen").toBeGreaterThanOrEqual(viewport.height);
+
+    const steps: [string, () => Promise<void>][] = [
+      ["hide", () => page.getByRole("button", { name: "Hide" }).click()],
+      ["show", () => page.getByRole("button", { name: "Show" }).click()],
+      ["spell out", () => page.getByRole("button", { name: "Spell it out" }).click()],
+      ["close with Escape", () => page.keyboard.press("Escape")],
+      ["attack speeds", () => page.getByRole("button", { name: "Other attack speeds" }).first().click()],
+      ["close by pressing outside", () => page.mouse.click(2, viewport.height - 2)],
+      ["passphrase", () => page.getByRole("link", { name: "Passphrase", exact: true }).click()],
+      ["PIN", () => page.getByRole("link", { name: "PIN", exact: true }).click()],
+      ["strength", () => page.getByRole("link", { name: "Strength", exact: true }).click()],
+      ["password", () => page.getByRole("link", { name: "Password", exact: true }).click()],
+    ];
+    for (const [name, act] of steps) {
+      await act();
+      expect(await layout(), name).toEqual(start);
+    }
+    await expect(page.locator("[data-spell]")).toBeHidden();
+    await expect(page.locator("#crack-gen")).toBeHidden();
+  });
+}
+
+test("the secret stays on one line at any length", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto("/");
+  await secret(page);
+  const lines = () =>
+    page.locator("[data-secret-value]").evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
+  for (const length of ["8", "64", "128"]) {
+    await page.locator("#pw-length-num").fill(length);
+    await page.locator("#pw-length-num").press("Enter");
+    await expect.poll(async () => (await secret(page)).length).toBe(Number(length));
+    expect(await lines(), `${length} characters`).toBe(1);
+  }
+  // Too long to show whole: it scrolls sideways, and a fade marks the hidden end.
+  await expect(page.locator("[data-secret-value]")).toHaveAttribute("data-overflow", "end");
+});
