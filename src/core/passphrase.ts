@@ -31,7 +31,7 @@ function capitalizeWord(word: string): string {
 export function generatePassphrase(
   opts: PassphraseOptions,
   wordlist: readonly string[],
-): { value: string; entropyBits: number } {
+): { value: string; words: readonly string[]; entropyBits: number } {
   assertSecureRandom();
   if (wordlist.length < 2) throw new RangeError("a passphrase needs a wordlist of at least two words");
   const count = clampInteger(opts.words, PASSPHRASE_LIMITS);
@@ -53,6 +53,7 @@ export function generatePassphrase(
 
   return {
     value: words.join(separator),
+    words,
     entropyBits: passphraseEntropyBits(count, wordlist.length, opts.includeDigit),
   };
 }

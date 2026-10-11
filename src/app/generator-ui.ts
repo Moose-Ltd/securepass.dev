@@ -10,7 +10,7 @@ import { clampInteger, hasSecureRandom } from "../core/random.ts";
 import { ratingFromBits } from "../core/rating.ts";
 import { loadWordlist } from "../core/wordlist.ts";
 import { announce } from "./announcer.ts";
-import { copySecret, copyShortcutHint } from "./copy.ts";
+import { copySecret, copyShortcutHint, selectContents } from "./copy.ts";
 import { $, $$, debounce, el } from "./dom.ts";
 import { savePrefs, type Prefs } from "./prefs.ts";
 import { SecretDisplay } from "./secret-display.ts";
@@ -89,6 +89,7 @@ export class Generator {
     const mode = this.mode;
     let value: string;
     let bits: number;
+    let words: readonly string[] | undefined;
     if (mode === "password") {
       const result = generatePassword(this.prefs.password);
       this.showSetAvailability(result.unavailable);
@@ -100,14 +101,26 @@ export class Generator {
       }
       ({ value, entropyBits: bits } = result);
     } else if (mode === "passphrase") {
-      this.wordlist ??= await loadWordlist();
+      try {
+        this.wordlist ??= await loadWordlist();
+      } catch {
+        // The word list is a separate file; offline before it was cached, or replaced by a deploy.
+        if (this.mode !== mode) return;
+        this.display.message("The word list couldn't load. Check your connection, then press New to try again.");
+        this.strength.clear();
+        this.setEnabled(false);
+        this.buttons.regenerate.disabled = false;
+        return;
+      }
       if (this.mode !== mode) return;
-      ({ value, entropyBits: bits } = generatePassphrase(this.prefs.passphrase, this.wordlist));
+      const passphrase = generatePassphrase(this.prefs.passphrase, this.wordlist);
+      ({ value, entropyBits: bits } = passphrase);
+      words = passphrase.words;
     } else {
       ({ value, entropyBits: bits } = generatePin(this.prefs.pin.digits));
     }
 
-    this.display.show(value, mode);
+    this.display.show(value, mode, words);
     this.setEnabled(true);
     this.renderStrength(bits);
     this.resetCopy();
@@ -142,15 +155,7 @@ export class Generator {
     regenerate.addEventListener("click", () => void this.generate());
     copy.addEventListener("click", () => void this.copy());
 
-    hide.addEventListener("click", () => {
-      const hidden = !this.display.isHidden;
-      this.display.setHidden(hidden);
-      hide.setAttribute("aria-pressed", String(hidden));
-      hide.setAttribute("aria-label", hidden ? "Show" : "Hide");
-      // Spelling out a hidden secret would defeat hiding it.
-      if (hidden) this.closeSpell();
-      spell.disabled = hidden || !this.display.current;
-    });
+    hide.addEventListener("click", () => this.setHidden(!this.display.isHidden));
 
     spell.addEventListener("click", () => {
       const open = spell.getAttribute("aria-expanded") !== "true";
@@ -177,6 +182,16 @@ export class Generator {
     });
   }
 
+  private setHidden(hidden: boolean): void {
+    const { hide, spell } = this.buttons;
+    this.display.setHidden(hidden);
+    hide.setAttribute("aria-pressed", String(hidden));
+    hide.setAttribute("aria-label", hidden ? "Show" : "Hide");
+    // Spelling out a hidden secret would defeat hiding it.
+    if (hidden) this.closeSpell();
+    spell.disabled = hidden || !this.display.current;
+  }
+
   private closeSpell(): void {
     this.buttons.spell.setAttribute("aria-expanded", "false");
     this.spell.hidden = true;
@@ -186,13 +201,16 @@ export class Generator {
   private async copy(): Promise<void> {
     const value = this.display.current;
     if (!value) return;
-    const outcome = await copySecret(value, this.secret);
+    const outcome = await copySecret(value);
     if (outcome === "copied") {
       this.buttons.copy.dataset.copied = "";
       this.copyLabel.textContent = "Copied";
       this.copyHint.textContent = "Copied. Some devices keep clipboard history, so clear it on a shared computer.";
       announce("Copied to the clipboard");
     } else {
+      // Reveal a hidden secret first, or the selection would hold the mask instead of the secret.
+      if (this.display.isHidden) this.setHidden(false);
+      selectContents(this.secret);
       this.copyHint.textContent = `Your browser blocked copying. The ${NOUNS[this.mode]} is selected: press ${copyShortcutHint()} to copy it.`;
       announce(`Copy was blocked. The ${NOUNS[this.mode]} is selected; press ${copyShortcutHint()}.`);
     }

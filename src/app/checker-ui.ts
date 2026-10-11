@@ -16,6 +16,7 @@ const FAILURES: Record<BreachFailure, string> = {
   http: "Have I Been Pwned didn't send a usable answer. Try again later.",
   unsupported: "This browser can't run the breach check privately.",
   busy: "A check is already running.",
+  cancelled: "The check was cancelled.",
 };
 
 const numberFormat = new Intl.NumberFormat("en");
@@ -25,6 +26,8 @@ export class Checker {
   private estimator: Estimator | null = null;
   private loading: Promise<void> | null = null;
   private loadFailed = false;
+  /** Cancels the breach lookup in progress when the password changes or the page goes away. */
+  private breachAbort: AbortController | null = null;
   private readonly input: HTMLInputElement;
   private readonly reveal: HTMLButtonElement;
   private readonly strength: StrengthBlock;
@@ -59,6 +62,7 @@ export class Checker {
       this.input.addEventListener(type, () => void this.loadEstimator(), { once: true });
     }
     this.input.addEventListener("input", () => {
+      this.cancelBreachCheck();
       this.dispatch({ type: "input", empty: this.input.value === "" });
       this.estimateSoon();
     });
@@ -78,7 +82,13 @@ export class Checker {
     this.setRevealed(false);
     this.estimateSoon.cancel();
     this.announceStrength.cancel();
+    this.cancelBreachCheck();
     this.dispatch({ type: "clear" });
+  }
+
+  private cancelBreachCheck(): void {
+    this.breachAbort?.abort();
+    this.breachAbort = null;
   }
 
   private setRevealed(revealed: boolean): void {
@@ -88,26 +98,34 @@ export class Checker {
   }
 
   private loadEstimator(): Promise<void> {
-    this.loading ??= (async () => {
+    if (!this.loading) {
       this.loadFailed = false;
+      this.loading = this.importEstimator();
       this.renderHint();
-      try {
-        const { loadEstimator } = await import("../check/estimator.ts");
-        this.estimator = await loadEstimator();
-      } catch {
-        this.loadFailed = true;
-        this.loading = null;
-      }
-      this.renderHint();
-      this.estimate();
-    })();
+    }
     return this.loading;
+  }
+
+  private async importEstimator(): Promise<void> {
+    try {
+      const { loadEstimator } = await import("../check/estimator.ts");
+      this.estimator = await loadEstimator();
+    } catch {
+      // A chunk that failed (offline first visit, or a deploy replaced it) waits for "Try again";
+      // retrying on its own would loop for as long as the field holds text.
+      this.loadFailed = true;
+      this.loading = null;
+      this.renderHint();
+      return;
+    }
+    this.renderHint();
+    this.estimate();
   }
 
   private estimate(): void {
     if (this.state.empty) return;
     if (!this.estimator) {
-      void this.loadEstimator();
+      if (!this.loadFailed) void this.loadEstimator();
       return;
     }
     const revision = this.state.revision;
@@ -120,7 +138,11 @@ export class Checker {
     const revision = this.state.revision;
     this.dispatch({ type: "breach-start" });
     announce("Checking breaches");
-    const result = await checkBreach(this.input.value);
+    this.cancelBreachCheck();
+    const abort = new AbortController();
+    this.breachAbort = abort;
+    const result = await checkBreach(this.input.value, abort.signal);
+    if (this.breachAbort === abort) this.breachAbort = null;
     this.dispatch({ type: "breach-result", revision, result });
     if (this.state.revision !== revision) return;
     if (result.status === "found") announce(`Found in breaches ${numberFormat.format(result.count)} times. Don't use this password.`);

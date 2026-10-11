@@ -50,29 +50,56 @@ const CLASS_SIZES: Readonly<Record<CharsetId, number>> = {
   symbols: CHARSETS.symbols.length + 1,
 };
 
+// Unmatched letters can still be words zxcvbn doesn't know: "Dankie!Totsiens" is two Afrikaans
+// words, not 15 random characters. A run of 4+ letters with a word's share of vowels keeps
+// zxcvbn's conservative price and never counts toward the random test. Random runs rarely look
+// like that ("ghvnh", "Xq"), and when one does the password is only underrated, never overrated.
+const WORD_LIKE = /[A-Za-z]{4,}/g;
+const VOWELS = /[aeiouy]/gi;
+const MIN_VOWEL_SHARE = 0.25;
+
+/** The characters of `token` outside word-like letter runs, which may be priced as random. */
+export function randomCandidates(token: string): string[] {
+  const kept: string[] = [];
+  let last = 0;
+  for (const match of token.matchAll(WORD_LIKE)) {
+    const word = match[0];
+    const vowels = word.match(VOWELS)?.length ?? 0;
+    if (vowels / word.length < MIN_VOWEL_SHARE) continue;
+    kept.push(...Array.from(token.slice(last, match.index)));
+    last = match.index + word.length;
+  }
+  kept.push(...Array.from(token.slice(last)));
+  return kept;
+}
+
 /**
- * log10 of the guesses after the random-run adjustment. When the brute-force runs together
- * hold at least 12 characters from at least 3 classes, each run is repriced at C^length, where
- * C is the combined size of the classes present across those runs (symbols: 33, the 32 ASCII
- * symbols plus space; anything non-ASCII counts as a symbol too), and the total is scaled by
- * the same ratio. Matched parts keep zxcvbn's price. Works in log space because C^length
- * overflows a double past ~150 characters.
+ * log10 of the guesses after the random-run adjustment. When the unmatched characters together
+ * number at least 12 and span at least 3 classes, those outside word-like runs are repriced at
+ * C each, where C is the combined size of the classes present (symbols: 33, the 32 ASCII symbols
+ * plus space; anything non-ASCII counts as a symbol too), and the total is scaled by the same
+ * ratio. Word-like runs and matched parts keep zxcvbn's price. Works in log space because
+ * C^length overflows a double past ~150 characters.
  */
 export function adjustedLog10Guesses(log10Guesses: number, sequence: readonly MatchExtended[]): number {
-  const runs = sequence.filter((match) => match.pattern === "bruteforce");
-  const unmatched = runs.flatMap((match) => Array.from(match.token));
+  const runs = sequence
+    .filter((match) => match.pattern === "bruteforce")
+    .map((match) => ({ match, candidates: randomCandidates(match.token) }));
+  const unmatched = runs.flatMap((run) => Array.from(run.match.token));
   if (unmatched.length < RANDOM_MIN_CHARS) return log10Guesses;
   const classes = new Set(unmatched.map(charClass));
   if (classes.size < RANDOM_MIN_CLASSES) return log10Guesses;
   const log10Alphabet = Math.log10([...classes].reduce((sum, id) => sum + CLASS_SIZES[id], 0));
 
   let adjusted = log10Guesses;
-  for (const run of runs) {
-    const runGuesses: unknown = run["guesses"];
+  for (const { match, candidates: random } of runs) {
+    const runGuesses: unknown = match["guesses"];
+    const length = Array.from(match.token).length;
     // zxcvbn's own price for an unmatched run is 10^length; used if the field is ever missing.
-    const zxcvbnLog10 = typeof runGuesses === "number" && runGuesses > 0 ? Math.log10(runGuesses) : run.token.length;
-    const randomLog10 = Array.from(run.token).length * log10Alphabet;
-    if (randomLog10 > zxcvbnLog10) adjusted += randomLog10 - zxcvbnLog10;
+    const zxcvbnLog10 = typeof runGuesses === "number" && runGuesses > 0 ? Math.log10(runGuesses) : length;
+    // Word-like characters stay at zxcvbn's 10 guesses each; the rest are priced as random.
+    const repricedLog10 = random.length * log10Alphabet + (length - random.length);
+    if (repricedLog10 > zxcvbnLog10) adjusted += repricedLog10 - zxcvbnLog10;
   }
   return adjusted;
 }

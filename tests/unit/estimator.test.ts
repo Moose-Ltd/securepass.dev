@@ -5,6 +5,7 @@ import {
   MAX_ANALYSED_CHARS,
   adjustedLog10Guesses,
   loadEstimator,
+  randomCandidates,
   type Estimator,
 } from "../../src/check/estimator.ts";
 import { DEFAULT_PASSWORD_OPTIONS } from "../../src/core/charsets.ts";
@@ -83,10 +84,12 @@ describe("estimator", () => {
     expect(result.suggestions).toEqual([FALLBACK_SUGGESTION]);
   });
 
-  it("rates a 20-character generated password with all four sets excellent", () => {
-    const result = estimate(generated(20));
-    expect(result.rating).toBe("excellent");
-    expect(result.effectiveBits).toBeGreaterThan(100);
+  it("rates 20-character generated passwords with all four sets excellent, never below strong", () => {
+    // About 2% contain a chance letter run that reads like a word ("Rope"), which keeps zxcvbn's
+    // conservative price and can land the whole on strong; nothing lands lower.
+    const ratings = Array.from({ length: 200 }, () => estimate(generated(20)).rating);
+    expect(ratings.every((r) => r === "excellent" || r === "strong")).toBe(true);
+    expect(ratings.filter((r) => r === "excellent").length).toBeGreaterThanOrEqual(180);
   });
 
   it("rates a random password split by a chance match by its unmatched characters together", () => {
@@ -105,6 +108,23 @@ describe("estimator", () => {
     const sixteen = estimate("UJ.,%J$Y<^)/JT2a");
     expect(sixteen.rating).toBe("excellent");
     expect(sixteen.effectiveBits).toBeCloseTo(16 * Math.log2(95) + 1, 6);
+  });
+
+  it("does not price words zxcvbn doesn't know as random characters", () => {
+    // Afrikaans and isiZulu words joined by a symbol: unknown to the English dictionaries, but
+    // still words a cracking tool's wordlists will hold. Before the word-like carve-out these rated
+    // strong or excellent.
+    for (const phrase of ["Dankie!Totsiens", "Sawubona!Ngiyabonga", "Siyabonga#Ubuntu", "Zdravo!Hvala"]) {
+      const result = estimate(phrase);
+      expect(["very-weak", "weak", "fair"], phrase).toContain(result.rating);
+    }
+  });
+
+  it("keeps generated passwords excellent when a chance letter run looks like a word", () => {
+    // "Rope" and "Kite" read as words, so they keep zxcvbn's price; the other 12 characters are
+    // still random over all four classes, and the whole stays above the excellent line.
+    const result = estimate("Rope7#q2Kite!9xZ$4w%");
+    expect(result.rating).toBe("excellent");
   });
 
   it("keeps zxcvbn's pricing for a 12-character lowercase-only random string", () => {
@@ -147,6 +167,18 @@ describe("estimator", () => {
   });
 });
 
+describe("randomCandidates", () => {
+  it("drops letter runs that read like words and keeps everything else", () => {
+    expect(randomCandidates("Dankie!Totsiens").join("")).toBe("!");
+    expect(randomCandidates("x9Ubuntu#").join("")).toBe("x9#");
+  });
+
+  it("keeps vowel-poor letter runs, which are what random strings produce", () => {
+    expect(randomCandidates("pxm:R9k7[ghvnh").join("")).toBe("pxm:R9k7[ghvnh");
+    expect(randomCandidates("chwAZ<H+AdXvt").join("")).toBe("chwAZ<H+AdXvt");
+  });
+});
+
 describe("adjustedLog10Guesses (KTD7)", () => {
   it("prices a long, varied unmatched run as random over its classes", () => {
     const token = "aB3$aB3$aB3$aB3$aB3$";
@@ -154,7 +186,7 @@ describe("adjustedLog10Guesses (KTD7)", () => {
   });
 
   it("uses only the classes present: lower + upper + digits is 62", () => {
-    expect(adjustedLog10Guesses(13, [bruteforce("abcDEF123abcD")])).toBeCloseTo(13 * Math.log10(62), 9);
+    expect(adjustedLog10Guesses(13, [bruteforce("bcdFGH123bcdF")])).toBeCloseTo(13 * Math.log10(62), 9);
   });
 
   it("leaves fewer than 12 unmatched characters alone", () => {

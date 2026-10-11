@@ -21,8 +21,15 @@ const check = (ok, message) => {
   if (!ok) failures.push(message);
 };
 
+// One retry, so a transient network blip right after a deploy doesn't fail a release that worked.
 async function get(url, init = {}) {
-  return fetch(url, { redirect: "manual", signal: AbortSignal.timeout(20_000), ...init });
+  const once = () => fetch(url, { redirect: "manual", signal: AbortSignal.timeout(20_000), ...init });
+  try {
+    return await once();
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    return once();
+  }
 }
 
 for (const path of PAGES) {

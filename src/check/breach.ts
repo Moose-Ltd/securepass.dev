@@ -3,7 +3,7 @@
 
 export const BREACH_API_ORIGIN = "https://api.pwnedpasswords.com";
 
-export type BreachFailure = "offline" | "timeout" | "http" | "unsupported" | "busy";
+export type BreachFailure = "offline" | "timeout" | "http" | "unsupported" | "busy" | "cancelled";
 
 export type BreachResult =
   | { status: "found"; count: number; prefix: string }
@@ -22,7 +22,8 @@ const PREFIX_LENGTH = 5;
 const ROW = /^([0-9A-F]{35}):(\d+)$/i;
 
 const listeners = new Set<(attempt: BreachAttempt) => void>();
-let inFlight = false;
+/** The signal of the lookup in progress, if any; an aborted one no longer blocks a new lookup. */
+let inFlight: AbortSignal | null = null;
 
 export function canCheckBreaches(): boolean {
   // crypto.subtle is undefined outside secure contexts even though the types say otherwise.
@@ -44,19 +45,24 @@ export async function sha1Hex(text: string): Promise<string> {
   return hex.toUpperCase();
 }
 
-export async function checkBreach(password: string): Promise<BreachResult> {
+/**
+ * Looks the password up. Aborting `signal` (the password was edited, or the page is going away)
+ * cancels the lookup: before the request it is never sent, and either way the result is
+ * "cancelled" and the next lookup may start at once.
+ */
+export async function checkBreach(password: string, signal: AbortSignal = new AbortController().signal): Promise<BreachResult> {
   if (!canCheckBreaches()) return failed("unsupported");
   // Claimed synchronously so a second click before hashing finishes is still refused.
-  if (inFlight) return failed("busy");
-  inFlight = true;
+  if (inFlight && !inFlight.aborted) return failed("busy");
+  inFlight = signal;
   try {
-    return await lookup(password);
+    return await lookup(password, signal);
   } finally {
-    inFlight = false;
+    if (inFlight === signal) inFlight = null;
   }
 }
 
-async function lookup(password: string): Promise<BreachResult> {
+async function lookup(password: string, signal: AbortSignal): Promise<BreachResult> {
   let hash: string;
   try {
     hash = await sha1Hex(password);
@@ -66,8 +72,11 @@ async function lookup(password: string): Promise<BreachResult> {
   const prefix = hash.slice(0, PREFIX_LENGTH);
   const suffix = hash.slice(PREFIX_LENGTH);
   const url = `${BREACH_API_ORIGIN}/range/${prefix}`;
+  if (signal.aborted) return failed("cancelled");
 
   const controller = new AbortController();
+  const cancel = () => controller.abort();
+  signal.addEventListener("abort", cancel, { once: true });
   let timedOut = false;
   const timer = setTimeout(() => {
     timedOut = true;
@@ -93,9 +102,10 @@ async function lookup(password: string): Promise<BreachResult> {
     return count > 0 ? { status: "found", count, prefix } : { status: "not-found", prefix };
   } catch {
     // Abort surfaces as an AbortError, so the flag tells a timeout apart from a dead network.
-    return failed(timedOut ? "timeout" : "offline");
+    return failed(timedOut ? "timeout" : signal.aborted ? "cancelled" : "offline");
   } finally {
     clearTimeout(timer);
+    signal.removeEventListener("abort", cancel);
   }
 }
 

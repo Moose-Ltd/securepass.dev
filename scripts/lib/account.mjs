@@ -54,14 +54,42 @@ export function wranglerFlags(devNull) {
  * Reads `wrangler whoami` output and returns null when it is the personal OAuth login on this
  * account, or the reason it is not. An API-token login is refused: it names no email.
  */
-export function loginProblem(whoami) {
+export function loginProblem(whoami, expectedEmailSha256 = ACCOUNT_EMAIL_SHA256) {
   const text = String(whoami ?? "").replace(/\x1b\[[0-9;]*m/g, "");
   if (/not authenticated|not logged in/i.test(text)) return "wrangler is not logged in; run `npx wrangler login` with the personal Cloudflare account";
   const email = /associated with the email (\S+?)\.?\s*$/im.exec(text)?.[1];
   if (!email) return "wrangler is not using an OAuth login; workstation deploys need the personal OAuth login";
-  if (sha256(email.toLowerCase()) !== ACCOUNT_EMAIL_SHA256) return `wrangler is logged in as ${email}, which is not the personal account; refusing to touch Cloudflare`;
+  if (sha256(email.toLowerCase()) !== expectedEmailSha256) return `wrangler is logged in as ${email}, which is not the personal account; refusing to touch Cloudflare`;
   if (!text.includes(ACCOUNT_ID)) return `the personal login cannot see account ${ACCOUNT_ID}`;
   return null;
+}
+
+/** The environment for build and smoke steps: no Cloudflare credential at all. */
+export function withoutCredentials(env) {
+  const clean = { ...env };
+  for (const key of [...OVERRIDES, DEPLOY_TOKEN, "CLOUDFLARE_API_TOKEN"]) delete clean[key];
+  return clean;
+}
+
+/**
+ * The reason the deploy may not touch Cloudflare, or null when it may: a deploy token that
+ * Cloudflare verifies as an active Account API Token of this account, or else (never in CI) the
+ * personal OAuth login. Fails closed. `verify` fetches TOKEN_VERIFY_URL with the token and
+ * resolves to { status, body }; `whoami` runs `wrangler whoami` and returns its output.
+ */
+export async function accountProblem({ env, verify, whoami }) {
+  const token = deployToken(env);
+  if (token) {
+    try {
+      const { status, body } = await verify(token);
+      return tokenProblem(status, body);
+    } catch (err) {
+      return `could not reach Cloudflare to verify ${DEPLOY_TOKEN}: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+  if (env.GITHUB_ACTIONS === "true") return `${DEPLOY_TOKEN} is empty: add it to the production environment's secrets`;
+  const who = whoami();
+  return who.error ? `wrangler whoami could not start: ${who.error}` : loginProblem(who.output);
 }
 
 /**

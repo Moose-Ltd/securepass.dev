@@ -62,6 +62,8 @@ const CLASS_FOR: Partial<Record<CharsetId, string>> = { digits: "c-digit", symbo
 
 export class SecretDisplay {
   private value = "";
+  /** The passphrase's words as generated, so spell-out never re-splits hyphenated words. */
+  private words: readonly string[] = [];
   private kind: GeneratorMode = "password";
   private hidden = false;
   private spellOpen = false;
@@ -79,8 +81,9 @@ export class SecretDisplay {
     return this.hidden;
   }
 
-  show(value: string, kind: GeneratorMode): void {
+  show(value: string, kind: GeneratorMode, words: readonly string[] = []): void {
     this.value = value;
+    this.words = words;
     this.kind = kind;
     this.output.dataset.kind = kind;
     this.render();
@@ -147,8 +150,7 @@ export class SecretDisplay {
   private renderSpell(): void {
     const items: HTMLLIElement[] = [];
     if (this.kind === "passphrase") {
-      const words = this.value.split(/[-. _,]+|(?<=[a-z0-9])(?=[A-Z])/).filter(Boolean);
-      words.forEach((word, i) =>
+      this.words.forEach((word, i) =>
         items.push(el("li", {}, [el("span", { className: "spell__char", text: word }), el("span", { className: "spell__pos", text: `word ${i + 1}` })])),
       );
     } else {

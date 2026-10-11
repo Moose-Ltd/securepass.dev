@@ -316,3 +316,29 @@ describe("attempt hook (KTD10)", () => {
     expect(kept).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("cancellation (R36, R37)", () => {
+  it("never sends a lookup whose signal aborted before the request", async () => {
+    const mock = respondWith(`${SUFFIX}:3`);
+    const attempts: BreachAttempt[] = [];
+    breach.onBreachAttempt((a) => attempts.push(a));
+    const abort = new AbortController();
+    abort.abort();
+    await expect(breach.checkBreach(PASSWORD, abort.signal)).resolves.toEqual({ status: "failed", reason: "cancelled" });
+    expect(mock).not.toHaveBeenCalled();
+    expect(attempts).toEqual([]);
+  });
+
+  it("cancels a lookup in flight and frees the slot for the next one at once", async () => {
+    const { started } = hangingFetch();
+    const abort = new AbortController();
+    const first = breach.checkBreach(PASSWORD, abort.signal);
+    await started;
+    abort.abort();
+    // The edited password's lookup is not refused as busy, even before the first one settles.
+    respondWith(`${SUFFIX}:3`);
+    const second = breach.checkBreach(PASSWORD);
+    await expect(first).resolves.toEqual({ status: "failed", reason: "cancelled" });
+    await expect(second).resolves.toEqual({ status: "found", count: 3, prefix: PREFIX });
+  });
+});

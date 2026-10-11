@@ -93,7 +93,13 @@ CI (`.github/workflows/ci.yml`) runs the typecheck, unit tests, build and browse
 - **Zone** (securepass.dev) - Workers Routes - Edit
 - **Zone** (securepass.dev) - Zone - Read
 
-Then add it as an environment secret of `production`.
+Before adding the token, make sure the repository's `production` environment allows deployments from `main` only:
+
+1. Open **Settings**, then **Environments**, then **production**.
+2. Under **Deployment branches and tags**, choose **Selected branches and tags**.
+3. Allow only `main`.
+
+That way no other branch can reach the token. Then add it as an environment secret of `production`.
 
 ## Security
 

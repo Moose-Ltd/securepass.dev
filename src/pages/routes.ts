@@ -82,6 +82,11 @@ export function routeForPath(pathname: string): Route | undefined {
   return ROUTES.find((r) => r.path === normalised);
 }
 
+/** The page file a route is built to, relative to the site root ("index.html", "pin-generator/index.html"). */
+export function pageFile(route: Route): string {
+  return route.path === "/" ? "index.html" : `${route.path.slice(1)}/index.html`;
+}
+
 export function canonicalUrl(route: Route): string {
   return route.path === "/" ? `${SITE_ORIGIN}/` : `${SITE_ORIGIN}${route.path}`;
 }

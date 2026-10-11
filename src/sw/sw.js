@@ -41,14 +41,17 @@ self.addEventListener("fetch", (event) => {
 });
 
 // Pages: the network when online, so a deploy shows up on the next load; the cached copy offline.
+// A captive portal or a stalled connection gets 4 seconds before the cached copy answers instead.
 async function networkFirst(request, url) {
+  const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
+  const cached = await caches.match(path, { cacheName: CACHE });
+  const network = fetch(request);
+  if (!cached) return network;
+  const fallback = new Promise((resolve) => setTimeout(() => resolve(cached), 4000));
   try {
-    return await fetch(request);
-  } catch (error) {
-    const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
-    const cached = await caches.match(path, { cacheName: CACHE });
-    if (cached) return cached;
-    throw error;
+    return await Promise.race([network, fallback]);
+  } catch {
+    return cached;
   }
 }
 
