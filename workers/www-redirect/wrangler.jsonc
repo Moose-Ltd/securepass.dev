@@ -1,0 +1,11 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // Redirects www.securepass.dev to the apex. Deployed by scripts/deploy.mjs after the main site.
+  "name": "securepass-www",
+  "account_id": "1e3dfc08a40b3d1df09d3760e320df40",
+  "main": "index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "www.securepass.dev", "custom_domain": true }]
+}

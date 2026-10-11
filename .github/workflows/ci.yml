@@ -1,0 +1,102 @@
+# Checks every pull request and push to main, then deploys main once they pass (R33). The deploy's
+# Cloudflare credential is an Account API Token held by the production environment, which only main
+# may use, so pull request runs never see it. Until that secret exists the deploy job does nothing.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # Redeploys main's tip by hand.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to a pull request cancels the older run; runs on main queue, so a deploy is never
+# cancelled midway.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+        env:
+          WRANGLER_SEND_METRICS: "false"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: playwright-report
+          path: test-results/
+          retention-days: 7
+
+  deploy:
+    needs: checks
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://securepass.dev
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: Check for the deploy token
+        id: token
+        env:
+          SECUREPASS_DEPLOY_TOKEN: ${{ secrets.SECUREPASS_DEPLOY_TOKEN }}
+        run: |
+          if [ -n "$SECUREPASS_DEPLOY_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SECUREPASS_DEPLOY_TOKEN is not set in the production environment, so this run does not deploy. See README: Deploying."
+          fi
+      # Only main's tip deploys, so re-running an old run can never roll production back.
+      - name: Check this commit is still main's tip
+        id: tip
+        if: steps.token.outputs.present == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tip="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          if [ "$tip" = "$GITHUB_SHA" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::main has moved on to $tip; that commit's own run deploys it."
+          fi
+      - if: steps.tip.outputs.deploy == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: steps.tip.outputs.deploy == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - if: steps.tip.outputs.deploy == 'true'
+        run: npm ci
+      - name: Deploy
+        if: steps.tip.outputs.deploy == 'true'
+        env:
+          SECUREPASS_DEPLOY_TOKEN: ${{ secrets.SECUREPASS_DEPLOY_TOKEN }}
+          WRANGLER_SEND_METRICS: "false"
+        run: npm run deploy
