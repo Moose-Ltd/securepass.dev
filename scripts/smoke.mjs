@@ -8,10 +8,18 @@
 
 const ORIGIN = (process.env.SMOKE_ORIGIN ?? "https://securepass.dev").replace(/\/$/, "");
 const LIVE = ORIGIN === "https://securepass.dev";
-const INJECTED = ["cloudflareinsights", "rocket-loader", "email-decode", "challenge-platform"];
+// The pages never reference /cdn-cgi/, so any mention is something Cloudflare added.
+const INJECTED = ["cloudflareinsights", "rocket-loader", "email-decode", "challenge-platform", "/cdn-cgi/"];
+// Cloudflare rewrites only what it takes for a browser's page load, so pages are fetched as one.
+const AS_BROWSER = {
+  headers: {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  },
+};
 
 // The TypeScript sources are the single source of truth; Node strips their types natively.
-const { SECURITY_HEADERS } = await import("../src/security/headers.ts");
+const { SECURITY_HEADERS, cacheControlFor } = await import("../src/security/headers.ts");
 const { ROUTES, SITE_ORIGIN } = await import("../src/pages/routes.ts");
 const PAGES = ROUTES.map((r) => r.path);
 
@@ -33,26 +41,34 @@ async function get(url, init = {}) {
 }
 
 for (const path of PAGES) {
-  const res = await get(`${ORIGIN}${path}`);
+  const res = await get(`${ORIGIN}${path}`, AS_BROWSER);
   const html = await res.text();
   check(res.status === 200, `${path} returns 200 (got ${res.status})`);
   for (const header of SECURITY_HEADERS) {
     check(res.headers.get(header.name) === header.value, `${path} sends ${header.name}`);
   }
+  check(res.headers.get("cache-control") === cacheControlFor(path), `${path} forbids rewriting in transit (got ${res.headers.get("cache-control")})`);
   for (const marker of INJECTED) check(!html.includes(marker), `${path} has no injected ${marker}`);
 }
 
-const missing = await get(`${ORIGIN}/smoke-check-missing-page`);
+const missing = await get(`${ORIGIN}/smoke-check-missing-page`, AS_BROWSER);
 const missingHtml = await missing.text();
 check(missing.status === 404, `unknown path returns 404 (got ${missing.status})`);
 check(missingHtml.includes("noindex"), "404 page is noindex");
+for (const marker of INJECTED) check(!missingHtml.includes(marker), `404 page has no injected ${marker}; if not, turn off Web Analytics automatic setup for the zone`);
 
 const robots = await (await get(`${ORIGIN}/robots.txt`)).text();
 check(robots.includes(`Sitemap: ${SITE_ORIGIN}/sitemap.xml`), "robots.txt names the sitemap");
 const sitemap = await get(`${ORIGIN}/sitemap.xml`);
 check((sitemap.headers.get("content-type") ?? "").includes("xml"), "sitemap.xml is served as XML");
 check((await (await get(`${ORIGIN}/.well-known/security.txt`)).text()).includes("Contact:"), "security.txt is served");
-check((await get(`${ORIGIN}/sw.js`)).headers.get("cache-control") === "no-cache", "sw.js is never cached");
+check((await get(`${ORIGIN}/sw.js`)).headers.get("cache-control") === cacheControlFor("/sw.js"), "sw.js is never cached");
+if (LIVE) {
+  // Pages opt out of Cloudflare's rewriting, which also opts them out of compression; scripts must not.
+  const script = (await (await get(`${ORIGIN}/`, AS_BROWSER)).text()).match(/\/assets\/main-[\w-]+\.js/)?.[0];
+  const encoding = script ? (await get(`${ORIGIN}${script}`, { headers: { "Accept-Encoding": "br, gzip" } })).headers.get("content-encoding") : null;
+  check(Boolean(encoding), `the main script is served compressed (got ${encoding})`);
+}
 check((await get(`${ORIGIN}/og/password.png`)).status === 200, "the preview image is served");
 
 if (LIVE) {

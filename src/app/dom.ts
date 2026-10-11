@@ -36,3 +36,16 @@ export function debounce<A extends unknown[]>(fn: (...args: A) => void, ms: numb
 
 let reducedMotion: MediaQueryList | undefined;
 export const prefersReducedMotion = () => (reducedMotion ??= window.matchMedia("(prefers-reduced-motion: reduce)")).matches;
+
+/** Closes a popover on Escape (returning focus to its button) or on a press outside both of them. */
+export function dismissible(trigger: HTMLElement, popover: HTMLElement, close: () => void): void {
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || event.defaultPrevented || popover.hidden) return;
+    close();
+    trigger.focus();
+  });
+  document.addEventListener("pointerdown", (event) => {
+    const target = event.target as Node;
+    if (!popover.hidden && !popover.contains(target) && !trigger.contains(target)) close();
+  });
+}

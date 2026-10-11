@@ -1,4 +1,4 @@
-import { SECURITY_HEADERS } from "../../src/security/headers.ts";
+import { SECURITY_HEADERS, cacheControlFor } from "../../src/security/headers.ts";
 import { expect, test } from "./fixtures.ts";
 
 test.describe("response headers", () => {
@@ -21,8 +21,16 @@ test.describe("response headers", () => {
   test("hashed assets are immutable and the service worker is never cached", async ({ request, page }) => {
     await page.goto("/");
     const css = await page.locator('link[rel="stylesheet"]').getAttribute("href");
-    expect((await request.get(css!)).headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
-    expect((await request.get("/sw.js")).headers()["cache-control"]).toBe("no-cache");
+    expect((await request.get(css!)).headers()["cache-control"]).toBe(cacheControlFor("/assets/*"));
+    expect((await request.get("/sw.js")).headers()["cache-control"]).toBe(cacheControlFor("/sw.js"));
+  });
+
+  test("pages may not be rewritten in transit and revalidate on every load", async ({ request }) => {
+    for (const path of ["/", "/passphrase-generator", "/pin-generator", "/password-strength-checker"]) {
+      expect((await request.get(path)).headers()["cache-control"], path).toBe("no-transform, public, max-age=0, must-revalidate");
+    }
+    // Everything else stays compressible: no-transform would also stop Cloudflare's compression.
+    expect((await request.get("/manifest.webmanifest")).headers()["cache-control"] ?? "").not.toContain("no-transform");
   });
 
   test("a trailing slash redirects to the canonical URL", async ({ request }) => {

@@ -11,10 +11,10 @@ import { ratingFromBits } from "../core/rating.ts";
 import { loadWordlist } from "../core/wordlist.ts";
 import { announce } from "./announcer.ts";
 import { copySecret, copyShortcutHint, selectContents } from "./copy.ts";
-import { $, $$, debounce, el } from "./dom.ts";
+import { $, $$, debounce, dismissible, el } from "./dom.ts";
 import { savePrefs, type Prefs } from "./prefs.ts";
 import { SecretDisplay } from "./secret-display.ts";
-import { StrengthBlock, headlineSentence } from "./strength-ui.ts";
+import { StrengthBlock } from "./strength-ui.ts";
 import type { GeneratorMode } from "../pages/routes.ts";
 
 const SET_NAMES: Record<CharsetId, string> = { upper: "Capital letters", lower: "Lower-case letters", digits: "Digits", symbols: "Symbols" };
@@ -74,7 +74,6 @@ export class Generator {
   async activate(mode: GeneratorMode): Promise<void> {
     this.mode = mode;
     for (const fieldset of $$("[data-options]", this.panel)) fieldset.hidden = fieldset.dataset.options !== mode;
-    $("[data-pin-badge]", this.panel).hidden = mode !== "pin";
     this.secret.setAttribute("aria-label", `Generated ${NOUNS[mode]}`);
     this.closeSpell();
     await this.generate();
@@ -82,7 +81,7 @@ export class Generator {
 
   async generate(): Promise<void> {
     if (!hasSecureRandom()) {
-      this.display.message("Your browser can't provide secure random numbers, so SecurePass won't generate anything here. Try an up-to-date browser.");
+      this.display.message("This browser can't provide secure random numbers. Try an up-to-date one.");
       this.setEnabled(false);
       return;
     }
@@ -94,7 +93,7 @@ export class Generator {
       const result = generatePassword(this.prefs.password);
       this.showSetAvailability(result.unavailable);
       if (!result.ok) {
-        this.display.message("Every character is excluded. Turn a character type back on or remove some exclusions.");
+        this.display.message("Every character is excluded. Allow some back.");
         this.strength.clear();
         this.setEnabled(false);
         return;
@@ -106,7 +105,7 @@ export class Generator {
       } catch {
         // The word list is a separate file; offline before it was cached, or replaced by a deploy.
         if (this.mode !== mode) return;
-        this.display.message("The word list couldn't load. Check your connection, then press New to try again.");
+        this.display.message("The word list couldn't load. Check your connection, then press New.");
         this.strength.clear();
         this.setEnabled(false);
         this.buttons.regenerate.disabled = false;
@@ -138,7 +137,8 @@ export class Generator {
         label: "Only where guesses are limited",
         bits,
         crackSeconds,
-        timeLine: [...headlineSentence(crackSeconds["offline-fast"]), " offline, or about ", throttled, " at 100 guesses an hour"],
+        // Offline, any PIN falls instantly; that figure stays in the attack-speed details.
+        timeLine: [throttled, " at 100 guesses an hour"],
       });
       return;
     }
@@ -163,6 +163,8 @@ export class Generator {
       this.spell.hidden = !open;
       this.display.setSpellOpen(open);
     });
+    dismissible(spell, this.spell, () => this.closeSpell());
+    dismissible(copy, this.copyHint, () => this.resetCopy());
 
     // Shortcuts work only while focus is inside the tool and never while typing (R41, WCAG 2.1.4).
     regenerate.setAttribute("aria-keyshortcuts", "R");
@@ -205,13 +207,13 @@ export class Generator {
     if (outcome === "copied") {
       this.buttons.copy.dataset.copied = "";
       this.copyLabel.textContent = "Copied";
-      this.copyHint.textContent = "Copied. Some devices keep clipboard history, so clear it on a shared computer.";
+      this.copyHint.textContent = "Copied. On a shared computer, clear the clipboard history.";
       announce("Copied to the clipboard");
     } else {
       // Reveal a hidden secret first, or the selection would hold the mask instead of the secret.
       if (this.display.isHidden) this.setHidden(false);
       selectContents(this.secret);
-      this.copyHint.textContent = `Your browser blocked copying. The ${NOUNS[this.mode]} is selected: press ${copyShortcutHint()} to copy it.`;
+      this.copyHint.textContent = `Your browser blocked copying. Press ${copyShortcutHint()} to copy the selection.`;
       announce(`Copy was blocked. The ${NOUNS[this.mode]} is selected; press ${copyShortcutHint()}.`);
     }
     this.copyHint.hidden = false;

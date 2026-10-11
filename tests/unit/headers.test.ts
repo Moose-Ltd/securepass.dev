@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { CONTENT_SECURITY_POLICY, THEME_BOOTSTRAP, THEME_BOOTSTRAP_HASH, renderHeadersFile } from "../../src/security/headers.ts";
+import { CONTENT_SECURITY_POLICY, THEME_BOOTSTRAP, THEME_BOOTSTRAP_HASH, cacheControlFor, renderHeadersFile } from "../../src/security/headers.ts";
+import { ROUTES } from "../../src/pages/routes.ts";
 import { renderPage } from "../../src/pages/render.ts";
 
 interface Rule {
@@ -51,10 +52,24 @@ describe("_headers", () => {
     for (const line of file.split("\n")) expect(line.length).toBeLessThan(2000);
   });
 
-  it("defines no header in more than one rule except Cache-Control, so nothing is comma-joined", () => {
+  it("defines no header but Cache-Control in more than one rule, so no security header is comma-joined", () => {
     const seen = new Map<string, number>();
     for (const rule of rules) for (const [name] of rule.headers) seen.set(name, (seen.get(name) ?? 0) + 1);
     for (const [name, count] of seen) if (name !== "Cache-Control") expect(count, name).toBe(1);
+  });
+
+  it("forbids rewriting pages in transit and keeps them revalidating, leaving everything else compressible", () => {
+    // Without no-transform, Cloudflare injects its analytics beacon into the HTML a browser receives.
+    // no-transform also stops Cloudflare compressing, so it stays off scripts, styles and word lists.
+    const page = "no-transform, public, max-age=0, must-revalidate";
+    for (const route of ROUTES) {
+      expect(rules.find((r) => r.pattern === route.path)?.headers, route.path).toEqual([["Cache-Control", page]]);
+      expect(cacheControlFor(route.path)).toBe(page);
+    }
+    expect(rules.find((r) => r.pattern === "/*")!.headers.some(([name]) => name === "Cache-Control")).toBe(false);
+    for (const rule of rules.filter((r) => !ROUTES.some((route) => route.path === r.pattern))) {
+      expect(rule.headers.flatMap(([, value]) => value).join(" "), rule.pattern).not.toContain("no-transform");
+    }
   });
 
   it("keeps clipboard writing and switches the rest off", () => {

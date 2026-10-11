@@ -16,7 +16,6 @@ export interface Route {
   /** Meta description and Open Graph description. */
   description: string;
   h1: string;
-  lede: string;
   /** Spoken when the mode changes without a reload. */
   announce: string;
 }
@@ -32,7 +31,6 @@ export const ROUTES: readonly Route[] = [
     description:
       "Generate strong, random passwords in your browser. Nothing is sent or stored: no tracking, no cookies, and it works offline. See how long each would take to crack.",
     h1: "Password generator",
-    lede: "Strong, random passwords made on your device. Nothing you generate is ever sent anywhere.",
     announce: "Password generator",
   },
   {
@@ -43,7 +41,6 @@ export const ROUTES: readonly Route[] = [
     description:
       "Create memorable passphrases from the EFF's 7,776-word list using your device's secure random generator. Private, offline and free, with crack-time estimates.",
     h1: "Passphrase generator",
-    lede: "Random words that are easy to type and hard to guess. Made on your device, never sent anywhere.",
     announce: "Passphrase generator",
   },
   {
@@ -54,7 +51,6 @@ export const ROUTES: readonly Route[] = [
     description:
       "Generate random 4 to 12 digit PINs with your browser's cryptographic random generator. Nothing leaves your device, and it works without a connection.",
     h1: "PIN generator",
-    lede: "Random PINs from your device's secure random generator, for places that lock after a few wrong tries.",
     announce: "PIN generator",
   },
   {
@@ -65,7 +61,6 @@ export const ROUTES: readonly Route[] = [
     description:
       "Test how strong a password is and how long it would take to crack, right on your device. Optionally check it against known breaches without ever sending it.",
     h1: "Password strength checker",
-    lede: "See how long a password would hold up against a real attack. It is analysed on your device and never sent anywhere.",
     announce: "Password strength checker",
   },
 ];

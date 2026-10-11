@@ -42,6 +42,12 @@ export const FALLBACK_SUGGESTION = "Use 15 or more characters, or a passphrase o
 // own generated password Fair while the generator says Excellent.
 const RANDOM_MIN_CHARS = 12;
 const RANDOM_MIN_CLASSES = 3;
+/**
+ * Share of the password that must be unmatched before any of it is repriced. Generator output is
+ * almost all unmatched; a password made of known patterns plus one unknown word is not, and its
+ * unknown word must not be priced as random characters ("Tr0ub4dor&3 summer2024").
+ */
+const RANDOM_MIN_SHARE = 0.6;
 const CLASS_SIZES: Readonly<Record<CharsetId, number>> = {
   upper: CHARSETS.upper.length,
   lower: CHARSETS.lower.length,
@@ -54,20 +60,55 @@ const CLASS_SIZES: Readonly<Record<CharsetId, number>> = {
 // words, not 15 random characters. A run of 4+ letters with a word's share of vowels keeps
 // zxcvbn's conservative price and never counts toward the random test. Random runs rarely look
 // like that ("ghvnh", "Xq"), and when one does the password is only underrated, never overrated.
+//
+// A word can also hide behind substitutions: "Tr0ub4dor" is "Troubador". Runs of 8+ letters and
+// substitution characters, with at least one substitution, are read with the substitutions undone.
+// Shorter runs are left alone: random strings produce them too often, and zxcvbn's own l33t
+// matching already catches common short words like "P@ssw0rd".
 const WORD_LIKE = /[A-Za-z]{4,}/g;
+const DISGUISED_WORD = /[A-Za-z0134578@$!|+]{8,}/g;
+const SUBSTITUTED = /[0134578@$!|+]/g;
+const SUBSTITUTED_LETTERS: Readonly<Record<string, string>> = {
+  "0": "o",
+  "1": "i",
+  "3": "e",
+  "4": "a",
+  "5": "s",
+  "7": "t",
+  "8": "b",
+  "@": "a",
+  $: "s",
+  "!": "i",
+  "|": "l",
+  "+": "t",
+};
 const VOWELS = /[aeiouy]/gi;
 const MIN_VOWEL_SHARE = 0.25;
 
-/** The characters of `token` outside word-like letter runs, which may be priced as random. */
+/** The [start, end) spans of `token` that read as words, in order of start. */
+function wordSpans(token: string): [number, number][] {
+  const spans: [number, number][] = [];
+  const add = (start: number, letters: string) => {
+    const vowels = letters.match(VOWELS)?.length ?? 0;
+    if (vowels / letters.length >= MIN_VOWEL_SHARE) spans.push([start, start + letters.length]);
+  };
+  for (const match of token.matchAll(WORD_LIKE)) add(match.index, match[0]);
+  for (const match of token.matchAll(DISGUISED_WORD)) {
+    // Each substitution is one UTF-16 unit for one, so the spans line up with the token.
+    const letters = match[0].replace(SUBSTITUTED, (ch) => SUBSTITUTED_LETTERS[ch] ?? ch);
+    if (letters !== match[0]) add(match.index, letters);
+  }
+  return spans.sort((a, b) => a[0] - b[0]);
+}
+
+/** The characters of `token` outside word-like runs, which may be priced as random. */
 export function randomCandidates(token: string): string[] {
   const kept: string[] = [];
   let last = 0;
-  for (const match of token.matchAll(WORD_LIKE)) {
-    const word = match[0];
-    const vowels = word.match(VOWELS)?.length ?? 0;
-    if (vowels / word.length < MIN_VOWEL_SHARE) continue;
-    kept.push(...Array.from(token.slice(last, match.index)));
-    last = match.index + word.length;
+  for (const [start, end] of wordSpans(token)) {
+    // Overlapping spans (a word inside a disguised one) merge into one.
+    if (start > last) kept.push(...Array.from(token.slice(last, start)));
+    last = Math.max(last, end);
   }
   kept.push(...Array.from(token.slice(last)));
   return kept;
@@ -75,10 +116,10 @@ export function randomCandidates(token: string): string[] {
 
 /**
  * log10 of the guesses after the random-run adjustment. When the unmatched characters together
- * number at least 12 and span at least 3 classes, those outside word-like runs are repriced at
- * C each, where C is the combined size of the classes present (symbols: 33, the 32 ASCII symbols
- * plus space; anything non-ASCII counts as a symbol too), and the total is scaled by the same
- * ratio. Word-like runs and matched parts keep zxcvbn's price. Works in log space because
+ * number at least 12, span at least 3 classes and make up at least 60% of the password, those
+ * outside word-like runs are repriced at C each, where C is the combined size of the classes
+ * present (symbols: 33, the 32 ASCII symbols plus space; anything non-ASCII counts as a symbol
+ * too), and the total is scaled by the same ratio. Word-like runs and matched parts keep zxcvbn's price. Works in log space because
  * C^length overflows a double past ~150 characters.
  */
 export function adjustedLog10Guesses(log10Guesses: number, sequence: readonly MatchExtended[]): number {
@@ -87,6 +128,8 @@ export function adjustedLog10Guesses(log10Guesses: number, sequence: readonly Ma
     .map((match) => ({ match, candidates: randomCandidates(match.token) }));
   const unmatched = runs.flatMap((run) => Array.from(run.match.token));
   if (unmatched.length < RANDOM_MIN_CHARS) return log10Guesses;
+  const total = sequence.reduce((sum, match) => sum + Array.from(match.token).length, 0);
+  if (unmatched.length < RANDOM_MIN_SHARE * total) return log10Guesses;
   const classes = new Set(unmatched.map(charClass));
   if (classes.size < RANDOM_MIN_CLASSES) return log10Guesses;
   const log10Alphabet = Math.log10([...classes].reduce((sum, id) => sum + CLASS_SIZES[id], 0));

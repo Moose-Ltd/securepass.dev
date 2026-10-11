@@ -4,7 +4,7 @@
 import { formatDuration } from "../core/crack-time.ts";
 import { RATING_LABELS, type Rating } from "../core/rating.ts";
 import { HEADLINE_SCENARIO, SCENARIOS, type ScenarioId } from "../core/scenarios.ts";
-import { $, $$, el } from "./dom.ts";
+import { $, $$, dismissible, el } from "./dom.ts";
 
 const LEVELS: Record<Rating, number> = { "very-weak": 1, weak: 2, fair: 3, strong: 4, excellent: 5, compromised: 5 };
 
@@ -20,10 +20,10 @@ export interface StrengthView {
   timeLine?: (string | Node)[];
 }
 
-export function headlineSentence(seconds: number): (string | Node)[] {
+function headlineSentence(seconds: number): (string | Node)[] {
   const formatted = formatDuration(seconds);
   const strong = el("strong", { text: formatted });
-  return formatted === "instantly" ? ["Could be cracked ", strong] : ["Would take ", strong, " to crack"];
+  return formatted === "instantly" ? ["Cracked ", strong] : [strong, " to crack"];
 }
 
 export class StrengthBlock {
@@ -50,11 +50,13 @@ export class StrengthBlock {
     this.cells = new Map(
       $$("[data-scenario]", this.details).map((row) => [row.dataset.scenario as ScenarioId, $("[data-scenario-time]", row)]),
     );
-    this.toggle.addEventListener("click", () => {
-      const open = this.toggle.getAttribute("aria-expanded") !== "true";
-      this.toggle.setAttribute("aria-expanded", String(open));
-      this.details.hidden = !open;
-    });
+    this.toggle.addEventListener("click", () => this.setOpen(this.toggle.getAttribute("aria-expanded") !== "true"));
+    dismissible(this.toggle, this.details, () => this.setOpen(false));
+  }
+
+  private setOpen(open: boolean): void {
+    this.toggle.setAttribute("aria-expanded", String(open));
+    this.details.hidden = !open;
   }
 
   render(view: StrengthView): void {

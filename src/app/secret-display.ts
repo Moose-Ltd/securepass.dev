@@ -7,6 +7,9 @@ import type { GeneratorMode } from "../pages/routes.ts";
 import { el, prefersReducedMotion } from "./dom.ts";
 
 const MASK = "•".repeat(16);
+// The mask is drawn with wider letter-spacing (0.12em against 0.015em), so it takes the width of
+// this many ordinary characters when the font is sized to fit (see .secret__value).
+const MASK_FIT_CHARS = 19;
 
 const SYMBOL_NAMES: Record<string, string> = {
   "!": "exclamation mark",
@@ -71,7 +74,18 @@ export class SecretDisplay {
   constructor(
     private readonly output: HTMLElement,
     private readonly spell: HTMLOListElement,
-  ) {}
+  ) {
+    // A secret too long for one line scrolls sideways; the fade shows which side has more.
+    output.addEventListener("scroll", () => this.markOverflow(), { passive: true });
+    new ResizeObserver(() => this.markOverflow()).observe(output);
+  }
+
+  private markOverflow(): void {
+    const { scrollLeft, scrollWidth, clientWidth } = this.output;
+    const sides = [scrollLeft > 1 && "start", scrollLeft + clientWidth < scrollWidth - 1 && "end"].filter(Boolean);
+    if (sides.length) this.output.dataset.overflow = sides.join(" ");
+    else delete this.output.dataset.overflow;
+  }
 
   get current(): string {
     return this.value;
@@ -99,7 +113,6 @@ export class SecretDisplay {
   message(text: string): void {
     this.value = "";
     this.output.removeAttribute("data-masked");
-    this.output.removeAttribute("data-long");
     this.output.replaceChildren(el("span", { className: "secret__placeholder", text }));
     this.spell.replaceChildren();
   }
@@ -118,7 +131,12 @@ export class SecretDisplay {
 
   private render(): void {
     if (!this.value) return;
-    this.output.toggleAttribute("data-long", this.value.length > 40);
+    // The font is monospaced, so the CSS sizes it from the character count to keep the secret on
+    // one line at any length; past the smallest size it scrolls sideways instead of wrapping.
+    const chars = this.hidden ? MASK_FIT_CHARS : Array.from(this.value).length;
+    this.output.style.setProperty("--chars", String(chars));
+    this.output.scrollLeft = 0;
+    requestAnimationFrame(() => this.markOverflow());
     if (this.hidden) {
       this.output.setAttribute("data-masked", "");
       this.output.replaceChildren(MASK);
