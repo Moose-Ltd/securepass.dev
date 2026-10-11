@@ -711,14 +711,30 @@ body:not([data-page="tool"]) main > section:first-child {
   color: var(--ink);
 }
 
+/* Phones: the offline status and the links on one line, the icon credit (which the licence
+   requires) on a second, smaller one; the separate Credits link would only repeat it. */
 @media (max-width: 699px) {
-  .site-footer--compact .footer__status,
-  .footer-bar__credit {
-    display: none;
+  .site-footer--compact {
+    padding-block: 6px calc(6px + env(safe-area-inset-bottom));
   }
 
   .footer-bar {
     justify-content: center;
+    gap: 2px 14px;
+  }
+
+  .footer-bar__nav {
+    gap: 2px 14px;
+  }
+
+  .footer-bar__credits {
+    display: none;
+  }
+
+  .footer-bar__credit {
+    flex-basis: 100%;
+    font-size: 0.75rem;
+    text-align: center;
   }
 }
 

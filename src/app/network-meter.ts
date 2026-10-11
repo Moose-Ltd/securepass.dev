@@ -48,11 +48,16 @@ export class RequestLedger {
 
 export function startNetworkMeter(views: { pill: HTMLElement; pillText: HTMLElement; card: HTMLElement | null; count: HTMLElement | null; label: HTMLElement | null; log: HTMLOListElement | null }): void {
   const ledger = new RequestLedger(location.origin);
+  // Pages without the request log (the tool pages) point the pill at the breach note once
+  // something was sent, since that is where this page says what it sent.
+  const explainer = views.pill.getAttribute("href") ?? "/how-it-works#network";
+  const sentHere = document.getElementById("breach-check") ? "#breach-check" : explainer;
 
   const render = () => {
     const requests = ledger.requests;
     const n = requests.length;
     views.pill.dataset.state = n ? "sent" : "quiet";
+    if (!views.log) views.pill.setAttribute("href", n ? sentHere : explainer);
     views.pillText.textContent = n ? `${n} sent` : "Nothing sent";
     // Each label starts with the visible text, so voice control can name the pill by what it shows.
     views.pill.setAttribute("aria-label", n ? `${n} sent to other sites. See what was sent` : "Nothing sent to other sites. See how this is checked");

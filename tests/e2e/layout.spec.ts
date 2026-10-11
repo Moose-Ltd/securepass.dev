@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, secret, test } from "./fixtures.ts";
+import { expect, secret, stubBreachApi, test } from "./fixtures.ts";
 
 async function inViewport(page: Page, selector: string) {
   const box = await page.locator(selector).first().boundingBox();
@@ -94,6 +94,40 @@ test("hiding the secret masks it and disables spelling it out", async ({ page })
   await page.getByRole("button", { name: "Show" }).click();
   await expect(page.locator("[data-secret-value]")).toHaveText(value);
 });
+
+for (const viewport of [
+  { width: 360, height: 640 },
+  { width: 375, height: 667 },
+  { width: 1280, height: 720 },
+  { width: 1366, height: 768 },
+]) {
+  test(`at ${viewport.width}x${viewport.height} every tool page, loaded directly, is exactly one screen with its footer in view`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    for (const path of ["/", "/passphrase-generator", "/pin-generator", "/password-strength-checker"]) {
+      await page.goto(path);
+      await expect(page.locator("[data-vault]")).toBeVisible();
+      const fit = await page.evaluate(() => ({ page: document.documentElement.scrollHeight, footer: Math.round(document.querySelector(".site-footer")!.getBoundingClientRect().bottom) }));
+      expect(fit, path).toEqual({ page: viewport.height, footer: viewport.height });
+      // The offline status (R42) and the icon credit the licence requires are visible at every size.
+      await expect(page.locator(".footer__status"), path).toBeVisible();
+      await expect(page.getByRole("link", { name: "Security icons created by Vectors Tank - Flaticon" }), path).toBeVisible();
+    }
+  });
+
+  test(`at ${viewport.width}x${viewport.height} the checker stays one screen with suggestions and a breach result`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await stubBreachApi(page, () => "0018A45C4D1DEF81644B54AB7F969B88D65:3");
+    await page.goto("/password-strength-checker");
+    const vault = () => page.locator("[data-vault]").evaluate((el) => Math.round(el.getBoundingClientRect().height));
+    const idle = await vault();
+    await page.getByLabel("Password to check").fill("password123");
+    await expect(page.locator("[data-check-feedback] li").first()).toBeVisible();
+    await page.getByRole("button", { name: "Check breaches" }).click();
+    await expect(page.locator("[data-breach-result]")).toBeVisible();
+    expect(await vault()).toBe(idle);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(viewport.height);
+  });
+}
 
 for (const viewport of [
   { width: 375, height: 667 },

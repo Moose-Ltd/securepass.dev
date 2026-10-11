@@ -14,6 +14,13 @@ import type { Mode } from "../pages/routes.ts";
 
 const optional = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector);
 
+const MOVED_TO_HOW = new Set(["#how", "#randomness", "#network", "#headers", "#storage", "#breach", "#crack-time", "#guides", "#best-practice"]);
+if (document.body.dataset.page === "tool" && location.hash) {
+  const hash = location.hash;
+  if (MOVED_TO_HOW.has(hash)) location.replace(`/how-it-works${hash}`);
+  else if (hash === "#faq" || hash.startsWith("#faq-")) location.replace(`/faq${hash}`);
+}
+
 initAnnouncer($("[data-announcer]"));
 initTheme($('[data-action="theme"]'));
 startNetworkMeter({

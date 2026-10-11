@@ -120,11 +120,6 @@ export function fileForPath(path: string): string {
   return path === "/" ? "index.html" : `${path.slice(1)}/index.html`;
 }
 
-/** The page file a route is built to, relative to the site root ("index.html", "pin-generator/index.html"). */
-export function pageFile(route: Route): string {
-  return fileForPath(route.path);
-}
-
 export function urlForPath(path: string): string {
   return path === "/" ? `${SITE_ORIGIN}/` : `${SITE_ORIGIN}${path}`;
 }

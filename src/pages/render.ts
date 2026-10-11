@@ -356,14 +356,16 @@ function renderTool(route: Route): string {
         <p class="field__hint" data-check-hint>Checked on your device. Never sent or saved.</p>
       </div>
       ${strengthBlock("check")}
-      <ul class="feedback" data-check-feedback></ul>
-      <div class="breach-box" data-breach>
+      <div class="check-notes">
+        <p class="breach-result" data-breach-result role="status" hidden></p>
+        <ul class="feedback" data-check-feedback></ul>
+      </div>
+      <div class="breach-box" id="breach-check" data-breach>
         <div class="breach-box__text">
           <p class="breach-box__title">Has it leaked in a breach?</p>
-          <p class="breach-box__note">Sends only 5 characters of its hash. <a href="/how-it-works#breach">How</a></p>
+          <p class="breach-box__note"><span data-breach-note>Sends only 5 characters of its hash.</span> <a href="/how-it-works#breach">How</a></p>
         </div>
         <button type="button" class="btn btn--secondary" data-action="breach" disabled>Check breaches</button>
-        <p class="breach-box__result" data-breach-result role="status" hidden></p>
       </div>
     </div>
     </div>
@@ -618,8 +620,8 @@ function renderCompactFooter(): string {
   const pages = CONTENT_PAGES.map((p) => `<a href="${p.path}">${esc(p.nav)}</a>`).join("");
   return `<footer class="site-footer site-footer--compact">
   <div class="container footer-bar">
-    <p class="footer__status"><span class="status-dot" aria-hidden="true"></span><span data-offline-status-short>No cookies, no tracking</span></p>
-    <nav class="footer-bar__nav" aria-label="Footer">${pages}<a href="${REPO_URL}">Source</a><a href="/how-it-works#credits">Credits</a></nav>
+    <p class="footer__status"><span class="status-dot" aria-hidden="true"></span><span data-offline-status-short>Preparing offline</span></p>
+    <nav class="footer-bar__nav" aria-label="Footer">${pages}<a href="${REPO_URL}">Source</a><a class="footer-bar__credits" href="/how-it-works#credits">Credits</a></nav>
     <p class="footer-bar__credit">${icon}</p>
   </div>
 </footer>`;

@@ -25,9 +25,26 @@ test.describe("strength checker", () => {
       expect(value.toUpperCase()).not.toContain(SUFFIX.slice(0, 8));
     }
     await expect(page.locator("[data-net-summary]")).toHaveText("1 sent");
-    // What was sent is stated beside the result, since the full request log lives on /how-it-works.
-    await expect(page.locator("[data-breach-result]")).toContainText(`Sent only ${PREFIX} to api.pwnedpasswords.com.`);
+    // The note beside the button says exactly what was sent, since the request log lives on /how-it-works.
+    await expect(page.locator("[data-breach-note]")).toHaveText(`Sent only ${PREFIX} to api.pwnedpasswords.com.`);
+    await expect(page.locator("[data-netpill]")).toHaveAttribute("href", "#breach-check");
+    // A new password puts the note back.
+    await page.getByLabel("Password to check").fill("password1234");
+    await expect(page.locator("[data-breach-note]")).toHaveText("Sends only 5 characters of its hash.");
     expect(watch.external.every((r) => r.url().startsWith("https://api.pwnedpasswords.com/range/"))).toBe(true);
+  });
+
+  test("a check that fails after sending still says what was sent", async ({ page }) => {
+    await page.route("https://api.pwnedpasswords.com/**", (route) =>
+      route.request().method() === "OPTIONS"
+        ? route.fulfill({ status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Add-Padding" } })
+        : route.fulfill({ status: 500, headers: { "Access-Control-Allow-Origin": "*" }, body: "" }),
+    );
+    await page.goto("/password-strength-checker");
+    await page.getByLabel("Password to check").fill("password123");
+    await page.getByRole("button", { name: "Check breaches" }).click();
+    await expect(page.locator("[data-breach-result]")).toHaveAttribute("data-status", "failed");
+    await expect(page.locator("[data-breach-note]")).toHaveText(`Sent only ${PREFIX} to api.pwnedpasswords.com.`);
   });
 
   test("AE13: a padding row with count 0 reads as not found", async ({ page }) => {
