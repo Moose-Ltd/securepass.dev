@@ -1,0 +1,8 @@
+* text=auto eol=lf
+
+# The EFF wordlist is verified by its SHA-256, so its bytes must never be rewritten.
+src/data/eff_large_wordlist.txt -text
+
+*.png binary
+*.ico binary
+*.woff2 binary

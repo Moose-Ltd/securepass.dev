@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // An assets-only Worker: there is no script, so no code runs for a page request and static asset
+  // requests are free. Security headers come from dist/_headers, which the build writes from
+  // src/security/headers.ts.
+  "name": "securepass",
+  // The owner's personal Cloudflare account. A bare `wrangler` on any other login fails here, and
+  // scripts/deploy.mjs proves the account before it uploads anything.
+  "account_id": "1e3dfc08a40b3d1df09d3760e320df40",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "drop-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  "routes": [{ "pattern": "securepass.dev", "custom_domain": true }]
+}
