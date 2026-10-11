@@ -84,7 +84,8 @@ describe("estimator", () => {
     expect(result.suggestions).toEqual([FALLBACK_SUGGESTION]);
   });
 
-  it("rates 20-character generated passwords with all four sets excellent, never below strong", () => {
+  // 200 estimates take a few seconds on a busy runner, beyond the default 5s limit.
+  it("rates 20-character generated passwords with all four sets excellent, never below strong", { timeout: 30_000 }, () => {
     // About 2% contain a chance letter run that reads like a word ("Rope"), which keeps zxcvbn's
     // conservative price and can land the whole on strong; nothing lands lower.
     const ratings = Array.from({ length: 200 }, () => estimate(generated(20)).rating);
@@ -117,6 +118,14 @@ describe("estimator", () => {
     for (const phrase of ["Dankie!Totsiens", "Sawubona!Ngiyabonga", "Siyabonga#Ubuntu", "Zdravo!Hvala"]) {
       const result = estimate(phrase);
       expect(["very-weak", "weak", "fair"], phrase).toContain(result.rating);
+    }
+  });
+
+  it("never prices an unknown word as random characters when known patterns make up the rest", () => {
+    // "troubador" is missing from the trimmed dictionaries, so zxcvbn leaves "Tr0ub4dor&3 " unmatched:
+    // 12 characters in 3 classes, which alone would qualify for repricing.
+    for (const phrase of ["Tr0ub4dor&3 summer2024", "Tr0ub4dor&3 summer2024 qwerty"]) {
+      expect(["very-weak", "weak", "fair"], phrase).toContain(estimate(phrase).rating);
     }
   });
 
@@ -205,6 +214,14 @@ describe("adjustedLog10Guesses (KTD7)", () => {
     ];
     // The total is scaled by each run's ratio: (95^6 / 10^6) twice.
     expect(adjustedLog10Guesses(15, sequence)).toBeCloseTo(15 + 2 * (6 * Math.log10(95) - 6), 9);
+  });
+
+  it("leaves the estimate alone when most of the password is matched patterns", () => {
+    const sequence: MatchExtended[] = [
+      bruteforce("aB3$aB3$aB3$"),
+      { pattern: "dictionary", i: 12, j: 27, token: "correcthorsebatt", guesses: 500 },
+    ];
+    expect(adjustedLog10Guesses(15, sequence)).toBe(15);
   });
 
   it("ignores everything when nothing is unmatched", () => {

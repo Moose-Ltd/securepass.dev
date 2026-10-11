@@ -42,6 +42,12 @@ export const FALLBACK_SUGGESTION = "Use 15 or more characters, or a passphrase o
 // own generated password Fair while the generator says Excellent.
 const RANDOM_MIN_CHARS = 12;
 const RANDOM_MIN_CLASSES = 3;
+/**
+ * Share of the password that must be unmatched before any of it is repriced. Generator output is
+ * almost all unmatched; a password made of known patterns plus one unknown word is not, and its
+ * unknown word must not be priced as random characters ("Tr0ub4dor&3 summer2024").
+ */
+const RANDOM_MIN_SHARE = 0.7;
 const CLASS_SIZES: Readonly<Record<CharsetId, number>> = {
   upper: CHARSETS.upper.length,
   lower: CHARSETS.lower.length,
@@ -75,10 +81,10 @@ export function randomCandidates(token: string): string[] {
 
 /**
  * log10 of the guesses after the random-run adjustment. When the unmatched characters together
- * number at least 12 and span at least 3 classes, those outside word-like runs are repriced at
- * C each, where C is the combined size of the classes present (symbols: 33, the 32 ASCII symbols
- * plus space; anything non-ASCII counts as a symbol too), and the total is scaled by the same
- * ratio. Word-like runs and matched parts keep zxcvbn's price. Works in log space because
+ * number at least 12, span at least 3 classes and make up at least 70% of the password, those
+ * outside word-like runs are repriced at C each, where C is the combined size of the classes
+ * present (symbols: 33, the 32 ASCII symbols plus space; anything non-ASCII counts as a symbol
+ * too), and the total is scaled by the same ratio. Word-like runs and matched parts keep zxcvbn's price. Works in log space because
  * C^length overflows a double past ~150 characters.
  */
 export function adjustedLog10Guesses(log10Guesses: number, sequence: readonly MatchExtended[]): number {
@@ -87,6 +93,8 @@ export function adjustedLog10Guesses(log10Guesses: number, sequence: readonly Ma
     .map((match) => ({ match, candidates: randomCandidates(match.token) }));
   const unmatched = runs.flatMap((run) => Array.from(run.match.token));
   if (unmatched.length < RANDOM_MIN_CHARS) return log10Guesses;
+  const total = sequence.reduce((sum, match) => sum + Array.from(match.token).length, 0);
+  if (unmatched.length < RANDOM_MIN_SHARE * total) return log10Guesses;
   const classes = new Set(unmatched.map(charClass));
   if (classes.size < RANDOM_MIN_CLASSES) return log10Guesses;
   const log10Alphabet = Math.log10([...classes].reduce((sum, id) => sum + CLASS_SIZES[id], 0));
