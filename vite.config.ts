@@ -4,7 +4,7 @@ import { headersPlugin } from "./build/headers-plugin.ts";
 import { fontPreloadPlugin, pagesPlugin } from "./build/pages-plugin.ts";
 import { serviceWorkerPlugin } from "./build/sw-plugin.ts";
 import { wordlistPlugin } from "./build/wordlist-plugin.ts";
-import { ROUTES, pageFile } from "./src/pages/routes.ts";
+import { CONTENT_PAGES, ROUTES, fileForPath, pageFile } from "./src/pages/routes.ts";
 
 const root = resolve(import.meta.dirname, "src");
 
@@ -12,6 +12,7 @@ const root = resolve(import.meta.dirname, "src");
 // serves at /dir (html_handling: drop-trailing-slash). Each stub is replaced by its prerendered page.
 export const PAGE_ENTRIES: Record<string, string> = {
   ...Object.fromEntries(ROUTES.map((route) => [route.mode, resolve(root, pageFile(route))])),
+  ...Object.fromEntries(CONTENT_PAGES.map((page) => [page.id, resolve(root, fileForPath(page.path))])),
   notFound: resolve(root, "404.html"),
 };
 

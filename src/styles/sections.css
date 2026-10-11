@@ -1,18 +1,24 @@
-/* ---------- Below the tool ---------- */
+/* ---------- The explanation pages ---------- */
 
-.guide {
-  margin-top: clamp(40px, 7vw, 72px);
-}
-
-.guide__inner {
+.guides__grid {
   display: grid;
-  gap: 12px 48px;
-  max-width: 800px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
+  margin-top: 28px;
 }
 
-.guide__title {
-  font-size: 1.25rem;
-  letter-spacing: -0.015em;
+.guide-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.guide-card h3 {
+  font-size: 1.0625rem;
 }
 
 .how,
@@ -21,6 +27,11 @@
 .practice,
 .faq {
   padding-block: clamp(64px, 9vw, 120px) 0;
+}
+
+/* On the explanation pages the first section opens the page, so it sits closer to the header. */
+body:not([data-page="tool"]) main > section:first-child {
+  padding-top: clamp(28px, 5vw, 64px);
 }
 
 .section-head {
@@ -659,6 +670,56 @@
 .site-footer {
   margin-top: clamp(80px, 12vw, 160px);
   background: var(--bg-sunk);
+}
+
+/* The tool pages' footer: one bar at the bottom of the screen. Phones keep only the links. */
+.site-footer--compact {
+  margin-top: 0;
+  padding-block: 10px calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+}
+
+.footer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 24px;
+}
+
+.site-footer--compact .footer__status {
+  margin-top: 0;
+  font-size: 0.8125rem;
+}
+
+.footer-bar__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+
+.footer-bar a {
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.footer-bar a:hover {
+  color: var(--ink);
+}
+
+@media (max-width: 699px) {
+  .site-footer--compact .footer__status,
+  .footer-bar__credit {
+    display: none;
+  }
+
+  .footer-bar {
+    justify-content: center;
+  }
 }
 
 .guilloche-band {

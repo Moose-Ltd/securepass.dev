@@ -25,7 +25,8 @@ test.describe("strength checker", () => {
       expect(value.toUpperCase()).not.toContain(SUFFIX.slice(0, 8));
     }
     await expect(page.locator("[data-net-summary]")).toHaveText("1 sent");
-    await expect(page.locator("[data-net-log]")).toContainText(PREFIX);
+    // What was sent is stated beside the result, since the full request log lives on /how-it-works.
+    await expect(page.locator("[data-breach-result]")).toContainText(`Sent only ${PREFIX} to api.pwnedpasswords.com.`);
     expect(watch.external.every((r) => r.url().startsWith("https://api.pwnedpasswords.com/range/"))).toBe(true);
   });
 

@@ -20,8 +20,8 @@ const AS_BROWSER = {
 
 // The TypeScript sources are the single source of truth; Node strips their types natively.
 const { SECURITY_HEADERS, cacheControlFor } = await import("../src/security/headers.ts");
-const { ROUTES, SITE_ORIGIN } = await import("../src/pages/routes.ts");
-const PAGES = ROUTES.map((r) => r.path);
+const { PAGE_PATHS, SITE_ORIGIN } = await import("../src/pages/routes.ts");
+const PAGES = PAGE_PATHS;
 
 const failures = [];
 const check = (ok, message) => {

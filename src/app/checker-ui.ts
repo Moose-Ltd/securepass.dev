@@ -2,7 +2,7 @@
 // the URL, history state, storage or an announcement, and the field is wiped whenever the user
 // leaves the mode or the page (R36).
 
-import { canCheckBreaches, checkBreach, type BreachFailure } from "../check/breach.ts";
+import { BREACH_API_ORIGIN, canCheckBreaches, checkBreach, type BreachFailure } from "../check/breach.ts";
 import type { Estimator } from "../check/estimator.ts";
 import { RATING_LABELS } from "../core/rating.ts";
 import { announce } from "./announcer.ts";
@@ -201,12 +201,14 @@ export class Checker {
     this.breachButton.disabled = state.empty || breach.status === "checking";
     this.breachButton.textContent = breach.status === "checking" ? "Checking…" : "Check breaches";
     this.breachResult.hidden = breach.status === "idle" || breach.status === "checking";
+    // Each answer also says exactly what left the device for it (R19).
+    const sent = (prefix: string) => ` Sent only ${prefix} to ${new URL(BREACH_API_ORIGIN).host}.`;
     if (breach.status === "found") {
       this.breachResult.dataset.status = "found";
-      this.breachResult.textContent = `Found ${numberFormat.format(breach.count)} ${breach.count === 1 ? "time" : "times"} in known data breaches. Don't use this password anywhere, and change it wherever you have.`;
+      this.breachResult.textContent = `Found ${numberFormat.format(breach.count)} ${breach.count === 1 ? "time" : "times"} in known data breaches. Don't use this password anywhere, and change it wherever you have.${sent(breach.prefix)}`;
     } else if (breach.status === "not-found") {
       this.breachResult.dataset.status = "not-found";
-      this.breachResult.textContent = "Not found in known breaches. That doesn't make it strong: check the rating above.";
+      this.breachResult.textContent = `Not found in known breaches. That doesn't make it strong: check the rating above.${sent(breach.prefix)}`;
     } else if (breach.status === "failed") {
       this.breachResult.dataset.status = "failed";
       this.breachResult.textContent = FAILURES[breach.reason];

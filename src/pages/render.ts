@@ -11,9 +11,9 @@ import { HEADLINE_SCENARIO, SCENARIOS } from "../core/scenarios.ts";
 import { CHROME_COLORS } from "../security/constants.ts";
 import { CREDITS, FAQ, GUIDES } from "./content.ts";
 import { ICONS } from "./icons.ts";
-import { ROUTES, SITE_ORIGIN, canonicalUrl, routeForMode, type Mode, type Route } from "./routes.ts";
+import { CONTENT_PAGES, ROUTES, SITE_ORIGIN, urlForPath, type ContentId, type ContentPage, type Mode, type Route } from "./routes.ts";
 
-export type PageId = Mode | "not-found";
+export type PageId = Mode | ContentId | "not-found";
 
 const REPO_URL = "https://github.com/Moose-Ltd/securepass.dev";
 const AUTHOR = { name: "Matt Berry", url: "https://matt-berry.com" };
@@ -42,25 +42,24 @@ function stripTags(htmlFragment: string): string {
 }
 
 export function renderPage(id: PageId): string {
-  const route = id === "not-found" ? undefined : routeForMode(id);
-  const mode: Mode = route?.mode ?? "password";
-  const body = route
-    ? [renderTool(route), renderGuide(route), renderHow(), renderBreach(), renderCrackTime(), renderBestPractice(), renderFaq()].join("\n")
-    : renderNotFound();
+  const route = ROUTES.find((r) => r.mode === id);
+  const content = CONTENT_PAGES.find((p) => p.id === id);
+  const kind = route ? "tool" : content ? "content" : "not-found";
+  const body = route ? renderTool(route) : content ? renderContent(content) : renderNotFound();
   const skip = route ? { target: "tool", label: "the tool" } : { target: "main", label: "content" };
 
   return `<!doctype html>
 <html lang="en" dir="ltr">
 <head>
-${renderHead(route)}
+${renderHead(route ?? content)}
 </head>
-<body data-mode="${mode}">
+<body data-mode="${route?.mode ?? "password"}" data-page="${kind}">
 <a class="skip-link" href="#${skip.target}">Skip to ${skip.label}</a>
 ${renderHeader(id)}
 <main id="main">
 ${body}
 </main>
-${renderFooter()}
+${route ? renderCompactFooter() : renderFooter()}
 <div class="sr-only" aria-live="polite" aria-atomic="true" data-announcer></div>
 <div class="toast" role="status" data-update-toast hidden>
   <p class="toast__text">A new version of SecurePass is ready.</p>
@@ -72,18 +71,18 @@ ${renderFooter()}
 `;
 }
 
-function renderHead(route: Route | undefined): string {
-  const title = route?.title ?? "Page not found | SecurePass";
-  const description = route?.description ?? "This page doesn't exist. SecurePass generates strong passwords on your device.";
-  const canonical = route ? canonicalUrl(route) : undefined;
-  const ogImage = `${SITE_ORIGIN}/og/${route?.mode ?? "password"}.png`;
-  const ogAlt = `SecurePass ${route?.h1.toLowerCase() ?? "password generator"}: made on your device, never sent anywhere.`;
+function renderHead(page: Route | ContentPage | undefined): string {
+  const title = page?.title ?? "Page not found | SecurePass";
+  const description = page?.description ?? "This page doesn't exist. SecurePass generates strong passwords on your device.";
+  const canonical = page ? urlForPath(page.path) : undefined;
+  const ogImage = `${SITE_ORIGIN}/og/${ogStem(page)}.png`;
+  const ogAlt = page && "mode" in page ? `SecurePass ${page.h1.toLowerCase()}: made on your device, never sent anywhere.` : "SecurePass: passwords made on your device, never sent anywhere.";
   const lines = [
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
     `<title>${esc(title)}</title>`,
     `<meta name="description" content="${esc(description)}">`,
-    `<meta name="robots" content="${route ? "index, follow, max-image-preview:large" : "noindex, follow"}">`,
+    `<meta name="robots" content="${page ? "index, follow, max-image-preview:large" : "noindex, follow"}">`,
     canonical ? `<link rel="canonical" href="${canonical}">` : "",
     '<meta name="color-scheme" content="light dark">',
     `<meta name="theme-color" content="${CHROME_COLORS.light}" media="(prefers-color-scheme: light)">`,
@@ -114,13 +113,18 @@ function renderHead(route: Route | undefined): string {
     `<script>${THEME_BOOTSTRAP}</script>`,
     '<link rel="stylesheet" href="/styles/main.css">',
     '<script type="module" src="/app/main.ts"></script>',
-    route ? `<script type="application/ld+json">${jsonLd(structuredData(route))}</script>` : "",
+    page ? `<script type="application/ld+json">${jsonLd(structuredData(page))}</script>` : "",
   ];
   return lines.filter(Boolean).join("\n");
 }
 
-function structuredData(route: Route): unknown {
-  const canonical = canonicalUrl(route);
+/** The preview image: each tool has its own; the content pages use the password generator's. */
+function ogStem(page: Route | ContentPage | undefined): string {
+  return page && "mode" in page ? page.mode : "password";
+}
+
+function structuredData(page: Route | ContentPage): unknown {
+  const canonical = urlForPath(page.path);
   const graph: unknown[] = [
     {
       "@type": "WebSite",
@@ -159,30 +163,31 @@ function structuredData(route: Route): unknown {
       "@type": "WebPage",
       "@id": `${canonical}#webpage`,
       url: canonical,
-      name: route.title,
-      description: route.description,
+      name: page.title,
+      description: page.description,
       isPartOf: { "@id": `${SITE_ORIGIN}/#website` },
       about: { "@id": `${SITE_ORIGIN}/#app` },
-      primaryImageOfPage: `${SITE_ORIGIN}/og/${route.mode}.png`,
+      primaryImageOfPage: `${SITE_ORIGIN}/og/${ogStem(page)}.png`,
       inLanguage: "en",
     },
   ];
-  if (route.path === "/") {
+  if (page.path === "/faq") {
     graph.push({
       "@type": "FAQPage",
-      "@id": `${SITE_ORIGIN}/#faq`,
+      "@id": `${SITE_ORIGIN}/faq#faq`,
       mainEntity: FAQ.map((item) => ({
         "@type": "Question",
         name: item.question,
         acceptedAnswer: { "@type": "Answer", text: stripTags(item.answer) },
       })),
     });
-  } else {
+  }
+  if (page.path !== "/") {
     graph.push({
       "@type": "BreadcrumbList",
       itemListElement: [
         { "@type": "ListItem", position: 1, name: "SecurePass", item: `${SITE_ORIGIN}/` },
-        { "@type": "ListItem", position: 2, name: route.h1, item: canonical },
+        { "@type": "ListItem", position: 2, name: page.h1, item: canonical },
       ],
     });
   }
@@ -190,20 +195,19 @@ function structuredData(route: Route): unknown {
 }
 
 function renderHeader(id: PageId): string {
-  const anchor = (hash: string) => (id === "not-found" ? `/${hash}` : hash);
+  const pages = CONTENT_PAGES.map((p) => `<a href="${p.path}"${p.id === id ? ' aria-current="page"' : ""}>${esc(p.nav)}</a>`).join("\n      ");
+  const network = id === "how-it-works" ? "#network" : "/how-it-works#network";
   return `<header class="site-header">
   <div class="site-header__inner">
     <a class="brand" href="/" aria-label="SecurePass home">
       <img class="brand__mark" src="/logo-64.png" width="32" height="32" alt="">
       <span class="brand__name">SecurePass</span>
     </a>
-    <nav class="site-nav" aria-label="Sections">
-      <a href="${anchor("#how")}">How it works</a>
-      <a href="${anchor("#breach")}">Breach check</a>
-      <a href="${anchor("#faq")}">FAQ</a>
+    <nav class="site-nav" aria-label="Pages">
+      ${pages}
     </nav>
     <div class="site-header__tools">
-      <a class="netpill" href="${anchor("#network")}" data-netpill>
+      <a class="netpill" href="${network}" data-netpill>
         ${ICONS.shield}
         <span class="netpill__text" data-net-summary>Nothing sent</span>
       </a>
@@ -244,15 +248,15 @@ function strengthBlock(scope: "gen" | "check"): string {
         <div class="strength__row">
           <p class="strength__rating"><span class="strength__label" data-rating-label>${scope === "check" ? "Waiting for a password" : "Calculating"}</span><span class="strength__bits" data-bits></span></p>
           <p class="strength__time" data-time-line>${scope === "check" ? "Type a password to rate it." : "&nbsp;"}</p>
+          <button type="button" class="linkbtn strength__toggle" data-action="details" aria-expanded="false" aria-controls="crack-${scope}">Attack speeds</button>
         </div>
-        <button type="button" class="linkbtn strength__toggle" data-action="details" aria-expanded="false" aria-controls="crack-${scope}">Other attack speeds</button>
         <div class="crack" id="crack-${scope}" hidden>
           <dl class="crack__list" data-crack-list>
 ${SCENARIOS.map(
   (s) => `            <div class="crack__row" data-scenario="${s.id}"><dt>${esc(s.label)} <span class="crack__rate">${esc(s.rateLabel)}</span></dt><dd data-scenario-time>&nbsp;</dd></div>`,
 ).join("\n")}
           </dl>
-          <p class="crack__note">Average time, if the attacker knows how it was made. <a href="#crack-time">How we estimate</a></p>
+          <p class="crack__note">Average time, if the attacker knows how it was made. <a href="/how-it-works#crack-time">How we estimate</a></p>
         </div>
       </div>`;
 }
@@ -329,7 +333,7 @@ function renderTool(route: Route): string {
           </div>
         </div>
         <div class="toggles">
-          <label class="switch"><input type="checkbox" role="switch" data-opt="capitalize"><span class="switch__track" aria-hidden="true"></span><span>Capitalise words</span></label>
+          <label class="switch"><input type="checkbox" role="switch" data-opt="capitalize"><span class="switch__track" aria-hidden="true"></span><span>Capitalise</span></label>
           <label class="switch"><input type="checkbox" role="switch" data-opt="includeDigit"><span class="switch__track" aria-hidden="true"></span><span>Add a number</span></label>
         </div>
       </fieldset>
@@ -356,7 +360,7 @@ function renderTool(route: Route): string {
       <div class="breach-box" data-breach>
         <div class="breach-box__text">
           <p class="breach-box__title">Has it leaked in a breach?</p>
-          <p class="breach-box__note">Sends only 5 characters of its hash. <a href="#breach">How</a></p>
+          <p class="breach-box__note">Sends only 5 characters of its hash. <a href="/how-it-works#breach">How</a></p>
         </div>
         <button type="button" class="btn btn--secondary" data-action="breach" disabled>Check breaches</button>
         <p class="breach-box__result" data-breach-result role="status" hidden></p>
@@ -367,17 +371,34 @@ function renderTool(route: Route): string {
 </section>`;
 }
 
-function renderGuide(route: Route): string {
-  const guide = GUIDES[route.mode];
-  return `<section class="guide" aria-labelledby="guide-title">
-  <div class="container guide__inner">
-    <h2 class="guide__title" id="guide-title">${esc(guide.heading)}</h2>
-    <div class="guide__body prose">${guide.body.map((p) => `<p>${p}</p>`).join("")}</div>
+function renderContent(page: ContentPage): string {
+  return page.id === "faq"
+    ? renderFaq(page)
+    : [renderHow(page), renderBreach(), renderCrackTime(), renderGuides(), renderBestPractice()].join("\n");
+}
+
+function renderGuides(): string {
+  const cards = ROUTES.map((route) => {
+    const guide = GUIDES[route.mode];
+    return `<article class="guide-card">
+        <h3>${esc(guide.heading)}</h3>
+        ${guide.body.map((p) => `<p>${p}</p>`).join("")}
+        <p><a href="${route.path}">${esc(route.h1)}</a></p>
+      </article>`;
+  }).join("\n      ");
+  return `<section class="guides" id="guides" aria-labelledby="guides-title">
+  <div class="container">
+    <header class="section-head">
+      <h2 class="section-head__title" id="guides-title">Password, passphrase or PIN</h2>
+    </header>
+    <div class="guides__grid prose">
+      ${cards}
+    </div>
   </div>
 </section>`;
 }
 
-function renderHow(): string {
+function renderHow(page: ContentPage): string {
   const directives = CSP_DIRECTIVES.map(
     (d) => `<div class="policy__row"><dt><code>${esc(d.value ? `${d.name} ${d.value}` : d.name)}</code></dt><dd>${esc(d.note)}</dd></div>`,
   ).join("\n          ");
@@ -388,8 +409,8 @@ function renderHow(): string {
   return `<section class="how" id="how" aria-labelledby="how-title">
   <div class="container">
     <header class="section-head">
-      <h2 class="section-head__title" id="how-title">How your passwords stay yours</h2>
-      <p class="section-head__lede">No server ever sees them. You can check every part.</p>
+      <h1 class="section-head__title" id="how-title" tabindex="-1">${esc(page.h1)}</h1>
+      <p class="section-head__lede">No server ever sees your passwords. You can check every part.</p>
     </header>
 
     <article class="feature" id="randomness" aria-labelledby="randomness-title">
@@ -559,14 +580,15 @@ function renderBestPractice(): string {
 </section>`;
 }
 
-function renderFaq(): string {
+function renderFaq(page: ContentPage): string {
   const items = FAQ.map(
     (item, i) => `<div class="faq__item"><dt id="faq-${i + 1}">${esc(item.question)}</dt><dd>${item.answer}</dd></div>`,
   ).join("\n      ");
   return `<section class="faq" id="faq" aria-labelledby="faq-title">
   <div class="container">
     <header class="section-head">
-      <h2 class="section-head__title" id="faq-title">Questions</h2>
+      <h1 class="section-head__title" id="faq-title" tabindex="-1">${esc(page.h1)}</h1>
+      <p class="section-head__lede">Short answers on privacy, offline use and strength.</p>
     </header>
     <dl class="faq__list">
       ${items}
@@ -579,12 +601,28 @@ function renderNotFound(): string {
   return `<section class="lost" aria-labelledby="lost-title">
   <div class="container lost__inner">
     <h1 class="lost__title" id="lost-title" tabindex="-1">This page doesn't exist</h1>
-    <p class="lost__text">Everything SecurePass does is on these four pages:</p>
+    <p class="lost__text">Everything SecurePass does is on these pages:</p>
     <ul class="lost__links">
-      ${ROUTES.map((r) => `<li><a href="${r.path}">${esc(r.h1)}</a></li>`).join("\n      ")}
+      ${[...ROUTES.map((r) => [r.path, r.h1]), ...CONTENT_PAGES.map((p) => [p.path, p.nav])].map(([path, name]) => `<li><a href="${path}">${esc(name ?? "")}</a></li>`).join("\n      ")}
     </ul>
   </div>
 </section>`;
+}
+
+/**
+ * The tool pages' footer: one line, pinned to the bottom of the screen with the tool above it. The
+ * full footer with every credit is on the other pages; the icon's attribution stays here too.
+ */
+function renderCompactFooter(): string {
+  const icon = CREDITS.find((c) => c.label === "Icon")?.html ?? "";
+  const pages = CONTENT_PAGES.map((p) => `<a href="${p.path}">${esc(p.nav)}</a>`).join("");
+  return `<footer class="site-footer site-footer--compact">
+  <div class="container footer-bar">
+    <p class="footer__status"><span class="status-dot" aria-hidden="true"></span><span data-offline-status-short>No cookies, no tracking</span></p>
+    <nav class="footer-bar__nav" aria-label="Footer">${pages}<a href="${REPO_URL}">Source</a><a href="/how-it-works#credits">Credits</a></nav>
+    <p class="footer-bar__credit">${icon}</p>
+  </div>
+</footer>`;
 }
 
 function renderFooter(): string {
@@ -609,11 +647,11 @@ function renderFooter(): string {
       <div class="footer__col">
         <h2 class="footer__heading">Learn</h2>
         <ul>
-          <li><a href="/#how">How it works</a></li>
-          <li><a href="/#headers">Security headers</a></li>
-          <li><a href="/#breach">Private breach check</a></li>
-          <li><a href="/#crack-time">Crack-time maths</a></li>
-          <li><a href="/#faq">FAQ</a></li>
+          <li><a href="/how-it-works">How it works</a></li>
+          <li><a href="/how-it-works#headers">Security headers</a></li>
+          <li><a href="/how-it-works#breach">Private breach check</a></li>
+          <li><a href="/how-it-works#crack-time">Crack-time maths</a></li>
+          <li><a href="/faq">FAQ</a></li>
         </ul>
       </div>
       <div class="footer__col">
@@ -626,7 +664,7 @@ function renderFooter(): string {
         </ul>
       </div>
     </nav>
-    <div class="footer__credits">
+    <div class="footer__credits" id="credits">
       <h2 class="footer__heading">Credits</h2>
       <ul>${credits}</ul>
     </div>

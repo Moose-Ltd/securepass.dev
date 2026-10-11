@@ -99,26 +99,27 @@ for (const viewport of [
   { width: 375, height: 667 },
   { width: 1366, height: 768 },
 ]) {
-  test(`at ${viewport.width}x${viewport.height} the first screen is only the tool, and nothing in it moves the page`, async ({ page }) => {
+  test(`at ${viewport.width}x${viewport.height} each tool page is exactly one screen, and nothing in it moves the page`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.goto("/");
     await secret(page);
-    // The tool's height, and where the content below it starts.
+    // The tool's height, the page's height, and where the footer sits.
     const layout = () =>
       page.evaluate(() => {
         const vault = document.querySelector("[data-vault]")!.getBoundingClientRect();
-        const next = document.querySelector(".guide")!.getBoundingClientRect();
-        return { vault: Math.round(vault.height), next: Math.round(next.top + window.scrollY) };
+        const footer = document.querySelector(".site-footer")!.getBoundingClientRect();
+        return { vault: Math.round(vault.height), page: document.documentElement.scrollHeight, footer: Math.round(footer.bottom + window.scrollY) };
       });
     const start = await layout();
-    expect(start.next, "content below the tool starts below the first screen").toBeGreaterThanOrEqual(viewport.height);
+    expect(start.page, "the page never scrolls").toBe(viewport.height);
+    expect(start.footer, "the footer sits at the bottom of the screen").toBe(viewport.height);
 
     const steps: [string, () => Promise<void>][] = [
       ["hide", () => page.getByRole("button", { name: "Hide" }).click()],
       ["show", () => page.getByRole("button", { name: "Show" }).click()],
       ["spell out", () => page.getByRole("button", { name: "Spell it out" }).click()],
       ["close with Escape", () => page.keyboard.press("Escape")],
-      ["attack speeds", () => page.getByRole("button", { name: "Other attack speeds" }).first().click()],
+      ["attack speeds", () => page.getByRole("button", { name: "Attack speeds" }).first().click()],
       ["close by pressing outside", () => page.mouse.click(2, viewport.height - 2)],
       ["passphrase", () => page.getByRole("link", { name: "Passphrase", exact: true }).click()],
       ["PIN", () => page.getByRole("link", { name: "PIN", exact: true }).click()],
@@ -166,7 +167,7 @@ test("overlays close on Escape (focus returns to their button) or a press outsid
   await expect(spellButton).toBeFocused();
   await expect(spellButton).toHaveAttribute("aria-expanded", "false");
 
-  const speeds = page.getByRole("button", { name: "Other attack speeds" }).first();
+  const speeds = page.getByRole("button", { name: "Attack speeds" }).first();
   await speeds.click();
   await page.keyboard.press("Escape");
   await expect(page.locator("#crack-gen")).toBeHidden();

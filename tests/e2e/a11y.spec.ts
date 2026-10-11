@@ -1,12 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, secret, test } from "./fixtures.ts";
 
-for (const path of ["/", "/passphrase-generator", "/pin-generator", "/password-strength-checker", "/nope"]) {
+for (const path of ["/", "/passphrase-generator", "/pin-generator", "/password-strength-checker", "/how-it-works", "/faq", "/nope"]) {
   for (const scheme of ["light", "dark"] as const) {
     test(`${path} has no serious accessibility violations in ${scheme} mode`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
       await page.goto(path);
-      if (path !== "/nope" && path !== "/password-strength-checker") await secret(page);
+      if (["/", "/passphrase-generator", "/pin-generator"].includes(path)) await secret(page);
       // Open the disclosures so their contents are checked too.
       for (const details of await page.locator("details").all()) await details.evaluate((d) => ((d as HTMLDetailsElement).open = true));
       const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();

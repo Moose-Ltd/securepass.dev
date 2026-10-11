@@ -19,7 +19,6 @@ test.describe("privacy", () => {
 
     expect(watch.external.map((r) => r.url())).toEqual([]);
     await expect(page.locator("[data-net-summary]")).toHaveText("Nothing sent");
-    await expect(page.locator("[data-net-count]")).toHaveText("0");
   });
 
   test("the generated secret never lands in the URL, history state or storage", async ({ page, watch }) => {

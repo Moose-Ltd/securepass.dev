@@ -18,7 +18,7 @@ export const FAQ: readonly FaqItem[] = [
   {
     question: "How can I check that for myself?",
     answer:
-      'Open developer tools, choose the Network tab, and use the tools: no requests appear. Or go offline after one visit; it keeps working. The <a href="#network">network counter</a> shows the same live.',
+      'Open developer tools, choose the Network tab, and use the tools: no requests appear. Or go offline after one visit; it keeps working. The <a href="/how-it-works#network">network counter</a> shows the same live.',
   },
   {
     question: "Does it work offline?",
@@ -28,7 +28,7 @@ export const FAQ: readonly FaqItem[] = [
   {
     question: "Is the breach check private?",
     answer:
-      'Yes. Only the first five characters of the password\'s SHA-1 hash are sent, and your device finds the match itself. <a href="#breach">How it works</a>.',
+      'Yes. Only the first five characters of the password\'s SHA-1 hash are sent, and your device finds the match itself. <a href="/how-it-works#breach">How it works</a>.',
   },
   {
     question: "What can't SecurePass protect against?",
