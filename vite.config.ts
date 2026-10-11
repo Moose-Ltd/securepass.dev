@@ -1,10 +1,14 @@
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
+import { headersPlugin } from "./build/headers-plugin.ts";
+import { fontPreloadPlugin, pagesPlugin } from "./build/pages-plugin.ts";
+import { serviceWorkerPlugin } from "./build/sw-plugin.ts";
+import { wordlistPlugin } from "./build/wordlist-plugin.ts";
 
 const root = resolve(import.meta.dirname, "src");
 
 // Every page is a real HTML entry so Vite emits dir/index.html files that the assets-only Worker
-// serves at /dir (html_handling: drop-trailing-slash).
+// serves at /dir (html_handling: drop-trailing-slash). Each stub is replaced by its prerendered page.
 export const PAGE_ENTRIES = {
   index: resolve(root, "index.html"),
   passphrase: resolve(root, "passphrase-generator/index.html"),
@@ -16,6 +20,7 @@ export const PAGE_ENTRIES = {
 export default defineConfig({
   root,
   publicDir: resolve(import.meta.dirname, "public"),
+  plugins: [wordlistPlugin(), pagesPlugin(root), fontPreloadPlugin(), headersPlugin(), serviceWorkerPlugin(root)],
   build: {
     outDir: resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,

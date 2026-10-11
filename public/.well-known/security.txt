@@ -1,0 +1,6 @@
+# Security policy for securepass.dev. See https://securitytxt.org/
+Contact: https://github.com/Moose-Ltd/securepass.dev/security/advisories/new
+Expires: 2027-10-11T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://securepass.dev/.well-known/security.txt
+Policy: https://github.com/Moose-Ltd/securepass.dev/blob/main/SECURITY.md

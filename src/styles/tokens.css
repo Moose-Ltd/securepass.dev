@@ -1,0 +1,161 @@
+/* Design tokens. The palette comes from the vault icon: navy outline ink, gold body, sky-blue
+   keyhole, periwinkle shackle. Light is a cool paper; dark is the vault at night, never neutral black. */
+
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../assets/fonts/instrument-sans-latin-wght.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../assets/fonts/jetbrains-mono-latin-wght.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  color-scheme: light;
+
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  --bg: #f4f6fb;
+  --bg-sunk: #e9edf6;
+  --surface: #ffffff;
+  --surface-2: #f3f6fc;
+  --line: #d8dfee;
+  --line-strong: #b6c1da;
+  --ink: #161f3e;
+  --ink-2: #44506f;
+  --ink-3: #5f6a89;
+  --navy: #29365f;
+
+  --gold: #f5b323;
+  --gold-hover: #f8c14a;
+  --gold-ink: #8f5400;
+  --gold-soft: #fdf0d2;
+  --sky: #2fa6dd;
+  --sky-ink: #0a6593;
+  --sky-soft: #e1f2fb;
+  --focus: #0a6593;
+  --on-gold: #161f3e;
+
+  --digit: #0a6593;
+  --symbol: #8f5400;
+
+  --guilloche: #29365f;
+  --guilloche-alpha: 0.11;
+  --code-bg: #121b40;
+  --code-ink: #dfe6fa;
+  --code-dim: #8e9bc6;
+
+  --rating-very-weak: #c2352b;
+  --rating-weak: #c55f12;
+  --rating-fair: #9a7400;
+  --rating-strong: #1d7f53;
+  --rating-excellent: #0a6aa3;
+  --rating-track: #e3e8f3;
+
+  --shadow-card: 0 1px 2px rgb(22 31 62 / 6%), 0 12px 24px -16px rgb(22 31 62 / 18%), 0 40px 80px -48px rgb(22 31 62 / 38%);
+  --shadow-raised: 0 1px 2px rgb(22 31 62 / 10%), 0 2px 6px -2px rgb(22 31 62 / 12%);
+
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 22px;
+  --r-pill: 999px;
+
+  --container: 1120px;
+  --gutter: clamp(16px, 4vw, 32px);
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0b1130;
+    --bg-sunk: #080d27;
+    --surface: #111a40;
+    --surface-2: #0e1638;
+    --line: #243066;
+    --line-strong: #364684;
+    --ink: #e9edfa;
+    --ink-2: #b1bbdc;
+    --ink-3: #8f9bc3;
+    --navy: #c9d6f0;
+
+    --gold: #f7b733;
+    --gold-hover: #fac65a;
+    --gold-ink: #f9c860;
+    --gold-soft: rgb(247 183 51 / 13%);
+    --sky: #5cc8f2;
+    --sky-ink: #7dd3f5;
+    --sky-soft: rgb(92 200 242 / 13%);
+    --focus: #7dd3f5;
+    --on-gold: #111a40;
+
+    --digit: #7dd3f5;
+    --symbol: #f9c860;
+
+    --guilloche: #9fb2e6;
+    --guilloche-alpha: 0.13;
+    --code-bg: #070c24;
+
+    --rating-very-weak: #ff7468;
+    --rating-weak: #ff9f55;
+    --rating-fair: #f6c94f;
+    --rating-strong: #4fd69e;
+    --rating-excellent: #6dcff5;
+    --rating-track: #23305f;
+
+    --shadow-card: 0 0 0 1px rgb(255 255 255 / 2%) inset, 0 24px 60px -30px rgb(0 0 0 / 70%);
+    --shadow-raised: 0 1px 2px rgb(0 0 0 / 35%);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b1130;
+  --bg-sunk: #080d27;
+  --surface: #111a40;
+  --surface-2: #0e1638;
+  --line: #243066;
+  --line-strong: #364684;
+  --ink: #e9edfa;
+  --ink-2: #b1bbdc;
+  --ink-3: #8f9bc3;
+  --navy: #c9d6f0;
+
+  --gold: #f7b733;
+  --gold-hover: #fac65a;
+  --gold-ink: #f9c860;
+  --gold-soft: rgb(247 183 51 / 13%);
+  --sky: #5cc8f2;
+  --sky-ink: #7dd3f5;
+  --sky-soft: rgb(92 200 242 / 13%);
+  --focus: #7dd3f5;
+  --on-gold: #111a40;
+
+  --digit: #7dd3f5;
+  --symbol: #f9c860;
+
+  --guilloche: #9fb2e6;
+  --guilloche-alpha: 0.13;
+  --code-bg: #070c24;
+
+  --rating-very-weak: #ff7468;
+  --rating-weak: #ff9f55;
+  --rating-fair: #f6c94f;
+  --rating-strong: #4fd69e;
+  --rating-excellent: #6dcff5;
+  --rating-track: #23305f;
+
+  --shadow-card: 0 0 0 1px rgb(255 255 255 / 2%) inset, 0 24px 60px -30px rgb(0 0 0 / 70%);
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 35%);
+}
