@@ -101,6 +101,8 @@ Before adding the token, make sure the repository's `production` environment all
 
 That way no other branch can reach the token. Then add it as an environment secret of `production`.
 
+CI deploys a commit only while it is still the tip of `main`, so re-running an older run never puts old code live. To roll back, revert the change on `main`, or run `npm run deploy` on a workstation from a clean `main`. **Run workflow** (`workflow_dispatch`) redeploys the current tip of `main`.
+
 ## Security
 
 See [SECURITY.md](SECURITY.md) to report a vulnerability. The site publishes [`/.well-known/security.txt`](https://securepass.dev/.well-known/security.txt).

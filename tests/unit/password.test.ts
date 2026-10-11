@@ -119,7 +119,9 @@ describe("effectiveAlphabet (R38)", () => {
 });
 
 describe("generatePassword", () => {
-  it("covers AE1: every enabled set appears and each position matches the exact valid-set distribution", () => {
+  // Real randomness: about 1 run in 1,000 fails by chance; two retries make that negligible, and a
+  // real bias still fails every attempt.
+  it("covers AE1: every enabled set appears and each position matches the exact valid-set distribution", { retry: 2 }, () => {
     const opts = options({ length: 8, sets: { upper: true, digits: true, symbols: true } });
     const sets = { upper: CHARSETS.upper, digits: CHARSETS.digits, symbols: CHARSETS.symbols };
     const sizes = [sets.upper.length, sets.digits.length, sets.symbols.length];

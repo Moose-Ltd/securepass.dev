@@ -22,7 +22,9 @@ afterEach(() => {
 
 describe("randomInt", () => {
   for (const n of [3, 7, 62, 7776]) {
-    it(`draws uniformly from [0, ${n}) over 100,000 draws`, () => {
+    // Real randomness: a fair source fails this rarely, so two retries make a chance failure negligible
+    // while a real bias still fails every attempt.
+    it(`draws uniformly from [0, ${n}) over 100,000 draws`, { retry: 2 }, () => {
       const draws = 100_000;
       const counts = new Array<number>(n).fill(0);
       for (let i = 0; i < draws; i += 1) {

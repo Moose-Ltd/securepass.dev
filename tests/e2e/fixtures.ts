@@ -10,8 +10,20 @@ interface Watch {
 }
 
 export const test = base.extend<{ watch: Watch }>({
-  watch: async ({ page, baseURL }, use) => {
+  watch: async ({ page, baseURL, browserName }, use) => {
     const origin = new URL(baseURL!).origin;
+    if (browserName === "webkit" && origin.startsWith("http:")) {
+      // Playwright's WebKit applies upgrade-insecure-requests even to http://127.0.0.1, which Chromium
+      // and Firefox exempt as loopback, so every file would be fetched over HTTPS and fail. Production
+      // is HTTPS-only; against the local server, drop just that one directive and keep the rest.
+      await page.route(`${origin}/**`, async (route) => {
+        const response = await route.fetch();
+        const headers = response.headers();
+        const csp = headers["content-security-policy"];
+        if (csp) headers["content-security-policy"] = csp.replace(/(^|;\s*)upgrade-insecure-requests(?=\s*(;|$))/, "");
+        await route.fulfill({ response, headers });
+      });
+    }
     const external: Request[] = [];
     const consoleErrors: string[] = [];
     page.on("request", (request) => {

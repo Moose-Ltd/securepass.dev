@@ -13,7 +13,6 @@ declare global {
   }
 }
 
-
 /**
  * The only Trusted Types policy on the page. It admits exactly one script URL; anything else
  * throws. The CSP names it (`trusted-types securepass`), so no other policy can be created.
@@ -70,13 +69,15 @@ export function registerServiceWorker(views: { status: HTMLElement[]; shortStatu
     navigator.serviceWorker
       .register(scriptUrl(), { scope: "/" })
       .then((registration) => {
-        if (registration.waiting && navigator.serviceWorker.controller) offerUpdate(registration.waiting);
-        registration.addEventListener("updatefound", () => {
-          const incoming = registration.installing;
+        const watch = (incoming: ServiceWorker | null) => {
           incoming?.addEventListener("statechange", () => {
             if (incoming.state === "installed" && navigator.serviceWorker.controller) offerUpdate(incoming);
           });
-        });
+        };
+        if (registration.waiting && navigator.serviceWorker.controller) offerUpdate(registration.waiting);
+        // The navigation's own update check can find a new version before this listener exists.
+        watch(registration.installing);
+        registration.addEventListener("updatefound", () => watch(registration.installing));
         return navigator.serviceWorker.ready;
       })
       .then(() => setStatus("Ready to work offline. Turn off your connection and it keeps working.", true, "Ready offline"))
