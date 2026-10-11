@@ -35,7 +35,7 @@ The icon is not covered by the MIT license.
 
 - **Instrument Sans:** copyright 2022 The Instrument Sans Project Authors. [SIL Open Font License 1.1](src/assets/fonts/OFL-instrument-sans.txt).
 - **JetBrains Mono:** copyright 2020 The JetBrains Mono Project Authors. [SIL Open Font License 1.1](src/assets/fonts/OFL-jetbrains-mono.txt).
-- **Files:** only the Latin variable-weight subsets in `src/assets/fonts/` are included.
+- **Files:** only the Latin variable-weight subsets in `src/assets/fonts/` are included, copied from `@fontsource-variable/instrument-sans` and `@fontsource-variable/jetbrains-mono` 5.3.0. The packages themselves are not dependencies.
 
 ## Have I Been Pwned
 
