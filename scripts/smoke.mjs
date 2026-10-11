@@ -54,7 +54,7 @@ const missing = await get(`${ORIGIN}/smoke-check-missing-page`, AS_BROWSER);
 const missingHtml = await missing.text();
 check(missing.status === 404, `unknown path returns 404 (got ${missing.status})`);
 check(missingHtml.includes("noindex"), "404 page is noindex");
-for (const marker of INJECTED) check(!missingHtml.includes(marker), `404 page has no injected ${marker}`);
+for (const marker of INJECTED) check(!missingHtml.includes(marker), `404 page has no injected ${marker}; if not, turn off Web Analytics automatic setup for the zone`);
 
 const robots = await (await get(`${ORIGIN}/robots.txt`)).text();
 check(robots.includes(`Sitemap: ${SITE_ORIGIN}/sitemap.xml`), "robots.txt names the sitemap");
@@ -62,6 +62,10 @@ const sitemap = await get(`${ORIGIN}/sitemap.xml`);
 check((sitemap.headers.get("content-type") ?? "").includes("xml"), "sitemap.xml is served as XML");
 check((await (await get(`${ORIGIN}/.well-known/security.txt`)).text()).includes("Contact:"), "security.txt is served");
 check((await get(`${ORIGIN}/sw.js`)).headers.get("cache-control") === cacheControlFor("/sw.js"), "sw.js is never cached");
+// Pages opt out of Cloudflare's rewriting, which also opts them out of compression; scripts must not.
+const script = (await (await get(`${ORIGIN}/`, AS_BROWSER)).text()).match(//assets/main-[w-]+.js/)?.[0];
+const encoding = script ? (await get(`${ORIGIN}${script}`, { headers: { "Accept-Encoding": "br, gzip" } })).headers.get("content-encoding") : null;
+check(Boolean(encoding), `the main script is served compressed (got ${encoding})`);
 check((await get(`${ORIGIN}/og/password.png`)).status === 200, "the preview image is served");
 
 if (LIVE) {

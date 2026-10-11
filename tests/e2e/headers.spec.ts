@@ -25,12 +25,12 @@ test.describe("response headers", () => {
     expect((await request.get("/sw.js")).headers()["cache-control"]).toBe(cacheControlFor("/sw.js"));
   });
 
-  test("no response may be rewritten in transit, and pages revalidate on every load", async ({ request }) => {
+  test("pages may not be rewritten in transit and revalidate on every load", async ({ request }) => {
     for (const path of ["/", "/passphrase-generator", "/pin-generator", "/password-strength-checker"]) {
       expect((await request.get(path)).headers()["cache-control"], path).toBe("no-transform, public, max-age=0, must-revalidate");
     }
-    expect((await request.get("/does-not-exist")).headers()["cache-control"]).toBe("no-transform");
-    expect((await request.get("/manifest.webmanifest")).headers()["cache-control"]).toBe("no-transform");
+    // Everything else stays compressible: no-transform would also stop Cloudflare's compression.
+    expect((await request.get("/manifest.webmanifest")).headers()["cache-control"] ?? "").not.toContain("no-transform");
   });
 
   test("a trailing slash redirects to the canonical URL", async ({ request }) => {

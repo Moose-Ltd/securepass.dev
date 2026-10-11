@@ -58,16 +58,18 @@ describe("_headers", () => {
     for (const [name, count] of seen) if (name !== "Cache-Control") expect(count, name).toBe(1);
   });
 
-  it("forbids rewriting every response in transit, and keeps every page revalidating", () => {
+  it("forbids rewriting pages in transit and keeps them revalidating, leaving everything else compressible", () => {
     // Without no-transform, Cloudflare injects its analytics beacon into the HTML a browser receives.
-    const global = rules.find((r) => r.pattern === "/*")!;
-    expect(global.headers).toContainEqual(["Cache-Control", "no-transform"]);
+    // no-transform also stops Cloudflare compressing, so it stays off scripts, styles and word lists.
+    const page = "no-transform, public, max-age=0, must-revalidate";
     for (const route of ROUTES) {
-      expect(rules.find((r) => r.pattern === route.path)?.headers, route.path).toEqual([["Cache-Control", "public, max-age=0, must-revalidate"]]);
-      expect(cacheControlFor(route.path)).toBe("no-transform, public, max-age=0, must-revalidate");
+      expect(rules.find((r) => r.pattern === route.path)?.headers, route.path).toEqual([["Cache-Control", page]]);
+      expect(cacheControlFor(route.path)).toBe(page);
     }
-    expect(cacheControlFor("/assets/*")).toBe("no-transform, public, max-age=31536000, immutable");
-    expect(cacheControlFor("/manifest.webmanifest")).toBe("no-transform");
+    expect(rules.find((r) => r.pattern === "/*")!.headers.some(([name]) => name === "Cache-Control")).toBe(false);
+    for (const rule of rules.filter((r) => !ROUTES.some((route) => route.path === r.pattern))) {
+      expect(rule.headers.flatMap(([, value]) => value).join(" "), rule.pattern).not.toContain("no-transform");
+    }
   });
 
   it("keeps clipboard writing and switches the rest off", () => {

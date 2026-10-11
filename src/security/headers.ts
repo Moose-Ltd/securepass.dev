@@ -29,7 +29,7 @@ export const CSP_DIRECTIVES: readonly Directive[] = [
   {
     name: "script-src",
     value: `'self' '${THEME_BOOTSTRAP_HASH}'`,
-    note: "Run only SecurePass's own scripts, plus one tiny inline script that applies your theme, pinned by its hash.",
+    note: "Only SecurePass's own scripts, plus one inline theme script pinned by its hash.",
   },
   { name: "style-src", value: "'self'", note: "Load styles only from SecurePass. No inline styles." },
   { name: "img-src", value: "'self'", note: "Load images only from SecurePass." },
@@ -37,7 +37,7 @@ export const CSP_DIRECTIVES: readonly Directive[] = [
   {
     name: "connect-src",
     value: `'self' ${BREACH_API_ORIGIN}`,
-    note: "Allow network requests only to SecurePass and the breach-check service, which is only contacted when you press the button.",
+    note: "Requests go only to SecurePass, and to the breach check when you ask.",
   },
   { name: "manifest-src", value: "'self'", note: "Read the install manifest only from SecurePass." },
   { name: "worker-src", value: "'self'", note: "Run only SecurePass's own offline service worker." },
@@ -137,7 +137,7 @@ export const SECURITY_HEADERS: readonly Header[] = [
   {
     name: "Permissions-Policy",
     value: PERMISSIONS_POLICY,
-    note: `Camera, microphone, location and ${PERMISSIONS_POLICY_DENIED.length - 3} other device features are switched off. Only writing to the clipboard is allowed.`,
+    note: `Camera, microphone, location and ${PERMISSIONS_POLICY_DENIED.length - 3} more are off. Only clipboard writing is allowed.`,
   },
 ];
 
@@ -147,15 +147,12 @@ interface CacheRule {
 }
 
 /**
- * Every response carries no-transform, so Cloudflare never rewrites one on the way out: no Web
- * Analytics beacon, Rocket Loader or email obfuscation, whatever the zone's settings say. A
- * Cache-Control set in _headers replaces the platform default, so each rule below states its
- * full caching policy and Workers comma-joins it after this one.
+ * Pages carry no-transform, so Cloudflare never rewrites them on the way out: no Web Analytics
+ * beacon, Rocket Loader or email obfuscation, whatever the zone's settings say. It also turns off
+ * Cloudflare's compression, so only the HTML pages carry it; scripts, styles and the word lists
+ * stay compressed. Pages revalidate on every load, so a deploy shows up at once.
  */
-export const BASE_CACHE_CONTROL = "no-transform";
-
-/** Pages revalidate on every load, so a deploy shows up at once. */
-const PAGE_CACHE = "public, max-age=0, must-revalidate";
+const PAGE_CACHE = "no-transform, public, max-age=0, must-revalidate";
 
 /**
  * Narrower rules carry only Cache-Control. Workers merges every rule that matches a path and
@@ -168,15 +165,14 @@ export const CACHE_RULES: readonly CacheRule[] = [
   { pattern: "/og/*", value: "public, max-age=86400" },
 ];
 
-/** The Cache-Control a response matching `pattern` ends up with, once Workers joins the rules. */
-export function cacheControlFor(pattern: string): string {
-  const rule = CACHE_RULES.find((r) => r.pattern === pattern);
-  return rule ? `${BASE_CACHE_CONTROL}, ${rule.value}` : BASE_CACHE_CONTROL;
+/** The Cache-Control _headers sets for `pattern`, or undefined where the platform default applies. */
+export function cacheControlFor(pattern: string): string | undefined {
+  return CACHE_RULES.find((r) => r.pattern === pattern)?.value;
 }
 
 /** The text of dist/_headers. */
 export function renderHeadersFile(): string {
-  const lines = ["/*", `  Cache-Control: ${BASE_CACHE_CONTROL}`, ...SECURITY_HEADERS.map((h) => `  ${h.name}: ${h.value}`)];
+  const lines = ["/*", ...SECURITY_HEADERS.map((h) => `  ${h.name}: ${h.value}`)];
   for (const rule of CACHE_RULES) lines.push("", rule.pattern, `  Cache-Control: ${rule.value}`);
   return `${lines.join("\n")}\n`;
 }
