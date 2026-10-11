@@ -54,7 +54,8 @@ export function startNetworkMeter(views: { pill: HTMLElement; pillText: HTMLElem
     const n = requests.length;
     views.pill.dataset.state = n ? "sent" : "quiet";
     views.pillText.textContent = n ? `${n} sent` : "Nothing sent";
-    views.pill.setAttribute("aria-label", n ? `${n} ${n === 1 ? "request" : "requests"} sent to other sites. See details` : "Nothing sent to other sites. See how this is checked");
+    // Each label starts with the visible text, so voice control can name the pill by what it shows.
+    views.pill.setAttribute("aria-label", n ? `${n} sent to other sites. See what was sent` : "Nothing sent to other sites. See how this is checked");
     if (views.card) views.card.dataset.state = n ? "sent" : "quiet";
     if (views.count) views.count.textContent = String(n);
     if (views.label) views.label.textContent = `${n === 1 ? "request" : "requests"} to other sites since you opened this page`;

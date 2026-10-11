@@ -4,6 +4,7 @@
 
 import { createHash } from "node:crypto";
 import { BREACH_API_ORIGIN } from "../check/breach.ts";
+import { ROUTES } from "../pages/routes.ts";
 import { HSTS, SW_URL, THEME_STORAGE_KEY, TRUSTED_TYPES_POLICY } from "./constants.ts";
 
 export { TRUSTED_TYPES_POLICY };
@@ -146,18 +147,36 @@ interface CacheRule {
 }
 
 /**
+ * Every response carries no-transform, so Cloudflare never rewrites one on the way out: no Web
+ * Analytics beacon, Rocket Loader or email obfuscation, whatever the zone's settings say. A
+ * Cache-Control set in _headers replaces the platform default, so each rule below states its
+ * full caching policy and Workers comma-joins it after this one.
+ */
+export const BASE_CACHE_CONTROL = "no-transform";
+
+/** Pages revalidate on every load, so a deploy shows up at once. */
+const PAGE_CACHE = "public, max-age=0, must-revalidate";
+
+/**
  * Narrower rules carry only Cache-Control. Workers merges every rule that matches a path and
  * comma-joins a header defined twice, so no security header may appear here.
  */
 export const CACHE_RULES: readonly CacheRule[] = [
+  ...ROUTES.map((route) => ({ pattern: route.path, value: PAGE_CACHE })),
   { pattern: "/assets/*", value: "public, max-age=31536000, immutable" },
   { pattern: SW_URL, value: "no-cache" },
   { pattern: "/og/*", value: "public, max-age=86400" },
 ];
 
+/** The Cache-Control a response matching `pattern` ends up with, once Workers joins the rules. */
+export function cacheControlFor(pattern: string): string {
+  const rule = CACHE_RULES.find((r) => r.pattern === pattern);
+  return rule ? `${BASE_CACHE_CONTROL}, ${rule.value}` : BASE_CACHE_CONTROL;
+}
+
 /** The text of dist/_headers. */
 export function renderHeadersFile(): string {
-  const lines = ["/*", ...SECURITY_HEADERS.map((h) => `  ${h.name}: ${h.value}`)];
+  const lines = ["/*", `  Cache-Control: ${BASE_CACHE_CONTROL}`, ...SECURITY_HEADERS.map((h) => `  ${h.name}: ${h.value}`)];
   for (const rule of CACHE_RULES) lines.push("", rule.pattern, `  Cache-Control: ${rule.value}`);
   return `${lines.join("\n")}\n`;
 }

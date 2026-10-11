@@ -1,4 +1,4 @@
-import { SECURITY_HEADERS } from "../../src/security/headers.ts";
+import { SECURITY_HEADERS, cacheControlFor } from "../../src/security/headers.ts";
 import { expect, test } from "./fixtures.ts";
 
 test.describe("response headers", () => {
@@ -21,8 +21,16 @@ test.describe("response headers", () => {
   test("hashed assets are immutable and the service worker is never cached", async ({ request, page }) => {
     await page.goto("/");
     const css = await page.locator('link[rel="stylesheet"]').getAttribute("href");
-    expect((await request.get(css!)).headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
-    expect((await request.get("/sw.js")).headers()["cache-control"]).toBe("no-cache");
+    expect((await request.get(css!)).headers()["cache-control"]).toBe(cacheControlFor("/assets/*"));
+    expect((await request.get("/sw.js")).headers()["cache-control"]).toBe(cacheControlFor("/sw.js"));
+  });
+
+  test("no response may be rewritten in transit, and pages revalidate on every load", async ({ request }) => {
+    for (const path of ["/", "/passphrase-generator", "/pin-generator", "/password-strength-checker"]) {
+      expect((await request.get(path)).headers()["cache-control"], path).toBe("no-transform, public, max-age=0, must-revalidate");
+    }
+    expect((await request.get("/does-not-exist")).headers()["cache-control"]).toBe("no-transform");
+    expect((await request.get("/manifest.webmanifest")).headers()["cache-control"]).toBe("no-transform");
   });
 
   test("a trailing slash redirects to the canonical URL", async ({ request }) => {

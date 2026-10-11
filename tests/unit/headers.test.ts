@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { CONTENT_SECURITY_POLICY, THEME_BOOTSTRAP, THEME_BOOTSTRAP_HASH, renderHeadersFile } from "../../src/security/headers.ts";
+import { CONTENT_SECURITY_POLICY, THEME_BOOTSTRAP, THEME_BOOTSTRAP_HASH, cacheControlFor, renderHeadersFile } from "../../src/security/headers.ts";
+import { ROUTES } from "../../src/pages/routes.ts";
 import { renderPage } from "../../src/pages/render.ts";
 
 interface Rule {
@@ -51,10 +52,22 @@ describe("_headers", () => {
     for (const line of file.split("\n")) expect(line.length).toBeLessThan(2000);
   });
 
-  it("defines no header in more than one rule except Cache-Control, so nothing is comma-joined", () => {
+  it("defines no header but Cache-Control in more than one rule, so no security header is comma-joined", () => {
     const seen = new Map<string, number>();
     for (const rule of rules) for (const [name] of rule.headers) seen.set(name, (seen.get(name) ?? 0) + 1);
     for (const [name, count] of seen) if (name !== "Cache-Control") expect(count, name).toBe(1);
+  });
+
+  it("forbids rewriting every response in transit, and keeps every page revalidating", () => {
+    // Without no-transform, Cloudflare injects its analytics beacon into the HTML a browser receives.
+    const global = rules.find((r) => r.pattern === "/*")!;
+    expect(global.headers).toContainEqual(["Cache-Control", "no-transform"]);
+    for (const route of ROUTES) {
+      expect(rules.find((r) => r.pattern === route.path)?.headers, route.path).toEqual([["Cache-Control", "public, max-age=0, must-revalidate"]]);
+      expect(cacheControlFor(route.path)).toBe("no-transform, public, max-age=0, must-revalidate");
+    }
+    expect(cacheControlFor("/assets/*")).toBe("no-transform, public, max-age=31536000, immutable");
+    expect(cacheControlFor("/manifest.webmanifest")).toBe("no-transform");
   });
 
   it("keeps clipboard writing and switches the rest off", () => {
