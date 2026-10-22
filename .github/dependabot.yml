@@ -1,6 +1,9 @@
-# Weekly update pull requests for npm and the pinned GitHub Actions. A merge to main deploys, so each
-# one is reviewed like any other change. The cooldown keeps brand-new releases out of PRs until the
-# window in which compromised packages are usually caught has passed.
+# Managed by Moose-Ltd/mooseltd (apps.json, app "securepass"). Edit it there, not here:
+# the hub's daily audit opens a draft PR whenever this file drifts.
+#
+# Security updates arrive as soon as an advisory is published. Version updates
+# run weekly, and a 7-day cooldown keeps brand-new releases out until the
+# window in which hijacked packages are usually caught has passed.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -15,9 +18,15 @@ updates:
         patterns: ["@zxcvbn-ts/*"]
       tooling:
         patterns: ["vite", "vitest", "typescript", "wrangler", "@playwright/test", "@axe-core/playwright", "@types/node"]
+      minor-and-patch:
+        update-types: ["minor", "patch"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns: ["*"]
