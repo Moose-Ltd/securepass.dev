@@ -1,32 +1,54 @@
 # Managed by Moose-Ltd/mooseltd (apps.json, app "securepass"). Edit it there, not here:
 # the hub's daily audit opens a draft PR whenever this file drifts.
 #
-# Security updates arrive as soon as an advisory is published. Version updates
-# run weekly, and a 7-day cooldown keeps brand-new releases out until the
-# window in which hijacked packages are usually caught has passed.
+# Security updates arrive as soon as an advisory is published, skip the cooldown and are
+# grouped on their own. Version updates run weekly, and a 7-day cooldown keeps
+# brand-new releases out until the window in which hijacked packages are usually caught
+# has passed. Majors come one per PR, because they are the ones that break things.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Africa/Johannesburg
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
     groups:
       zxcvbn:
+        applies-to: version-updates
         patterns: ["@zxcvbn-ts/*"]
       tooling:
+        applies-to: version-updates
         patterns: ["vite", "vitest", "typescript", "wrangler", "@playwright/test", "@axe-core/playwright", "@types/node"]
       minor-and-patch:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
+      security:
+        applies-to: security-updates
         update-types: ["minor", "patch"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Africa/Johannesburg
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
     groups:
-      github-actions:
-        patterns: ["*"]
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
+      security:
+        applies-to: security-updates
+        update-types: ["minor", "patch"]
