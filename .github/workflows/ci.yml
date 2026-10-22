@@ -1,6 +1,8 @@
 # Checks every pull request and push to main, then deploys main once they pass (R33). The deploy's
-# Cloudflare credential is an Account API Token held by the production environment, which only main
-# may use, so pull request runs never see it. Until that secret exists the deploy job does nothing.
+# Cloudflare credential is the Moose-Ltd org secret CF_TOKEN_STATIC, an Account API Token with
+# Workers deploy and routes only (no data access). This workflow reads it only in the deploy job,
+# which runs in the production environment, and only main may deploy there. Dependabot and fork
+# pull requests never receive it.
 name: ci
 
 on:
@@ -58,21 +60,9 @@ jobs:
       group: deploy-production
       cancel-in-progress: false
     steps:
-      - name: Check for the deploy token
-        id: token
-        env:
-          SECUREPASS_DEPLOY_TOKEN: ${{ secrets.SECUREPASS_DEPLOY_TOKEN }}
-        run: |
-          if [ -n "$SECUREPASS_DEPLOY_TOKEN" ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::SECUREPASS_DEPLOY_TOKEN is not set in the production environment, so this run does not deploy. See README: Deploying."
-          fi
       # Only main's tip deploys, so re-running an old run can never roll production back.
       - name: Check this commit is still main's tip
         id: tip
-        if: steps.token.outputs.present == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -94,9 +84,12 @@ jobs:
           cache: npm
       - if: steps.tip.outputs.deploy == 'true'
         run: npm ci
+      # scripts/deploy.mjs reads the token as SECUREPASS_DEPLOY_TOKEN and verifies it belongs to the
+      # personal account before handing it to wrangler. A missing secret fails that check, so the
+      # deploy can never skip silently.
       - name: Deploy
         if: steps.tip.outputs.deploy == 'true'
         env:
-          SECUREPASS_DEPLOY_TOKEN: ${{ secrets.SECUREPASS_DEPLOY_TOKEN }}
+          SECUREPASS_DEPLOY_TOKEN: ${{ secrets.CF_TOKEN_STATIC }}
           WRANGLER_SEND_METRICS: "false"
         run: npm run deploy

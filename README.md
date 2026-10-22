@@ -87,19 +87,7 @@ The browser tests serve `dist/` through `wrangler dev`, so the real CSP, Trusted
 
 The deploy then builds the site, uploads it and the www redirect Worker, and runs `npm run smoke` against production.
 
-CI (`.github/workflows/ci.yml`) runs the typecheck, unit tests, build and browser tests on every pull request and push. It deploys `main` once the `SECUREPASS_DEPLOY_TOKEN` secret exists in the repository's `production` environment. To enable it, create an Account API Token on the personal Cloudflare account with these permissions:
-
-- **Account** - Workers Scripts - Edit
-- **Zone** (securepass.dev) - Workers Routes - Edit
-- **Zone** (securepass.dev) - Zone - Read
-
-Before adding the token, make sure the repository's `production` environment allows deployments from `main` only:
-
-1. Open **Settings**, then **Environments**, then **production**.
-2. Under **Deployment branches and tags**, choose **Selected branches and tags**.
-3. Allow only `main`.
-
-That way no other branch can reach the token. Then add it as an environment secret of `production`.
+CI (`.github/workflows/ci.yml`) runs the typecheck, unit tests, build and browser tests on every pull request and push, and deploys every push to `main` that passes them. The deploy job runs in the `production` environment, which allows `main` only. Its Cloudflare credential is the Moose-Ltd org secret `CF_TOKEN_STATIC`, an Account API Token shared by the static-site apps, with Workers deploy and routes permissions and no data access. It is managed from the [mooseltd hub](https://github.com/Moose-Ltd/mooseltd). The workflow hands it to `npm run deploy` as `SECUREPASS_DEPLOY_TOKEN`, so the account check above still applies, and a missing secret fails the deploy instead of skipping it.
 
 CI deploys a commit only while it is still the tip of `main`, so re-running an older run never puts old code live. To roll back, revert the change on `main`, or run `npm run deploy` on a workstation from a clean `main`. **Run workflow** (`workflow_dispatch`) redeploys the current tip of `main`.
 
