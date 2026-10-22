@@ -1,0 +1,82 @@
+# Managed by Moose-Ltd/mooseltd (apps.json, app "securepass"). Edit it there, not here:
+# the hub's daily audit opens a draft PR whenever this file drifts.
+#
+# Merges Dependabot's patch and minor updates, version and security alike, once
+# the "ci" workflow passes on them, then deploys main. Majors wait for a person.
+#
+# It runs on workflow_run, so it acts on the result of the whole CI run and never
+# checks out the pull request's code. A merge made with this workflow's own token
+# starts no push run, so it dispatches ci.yml on main itself.
+name: Dependabot merge
+
+on:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  merge:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      startsWith(github.event.workflow_run.head_branch, 'dependabot/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Merge a patch or minor update, then deploy main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          MAIN: ${{ github.event.repository.default_branch }}
+          DEPLOY_WORKFLOW: ci.yml
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+
+          pr="$(gh api "repos/$repo/commits/$HEAD_SHA/pulls" --jq "[.[] | select(.state == \"open\" and .head.sha == \"$HEAD_SHA\" and .user.login == \"dependabot[bot]\")][0].number // empty")"
+          if [ -z "$pr" ]; then
+            echo "::notice::No open Dependabot pull request has $HEAD_SHA as its head."
+            exit 0
+          fi
+
+          # Someone may have pushed to the branch; only Dependabot's own commit merges unattended.
+          author="$(gh api "repos/$repo/commits/$HEAD_SHA" --jq '.author.login // ""')"
+          if [ "$author" != "dependabot[bot]" ]; then
+            echo "::notice::#$pr's head commit is by $author, not Dependabot, so it waits for a person."
+            exit 0
+          fi
+
+          # Dependabot lists every bumped dependency's update-type in its commit message.
+          types="$(gh api "repos/$repo/commits/$HEAD_SHA" --jq .commit.message | sed -n 's/^ *update-type: *//p' | sort -u)"
+          if [ -z "$types" ] || printf '%s\n' "$types" | grep -qvE '^version-update:semver-(patch|minor)$'; then
+            echo "::notice::#$pr includes a major update (or has no update metadata), so it waits for a person."
+            exit 0
+          fi
+
+          # --match-head-commit: only the commit CI just passed is merged.
+          if gh pr merge "$pr" --repo "$repo" --squash --match-head-commit "$HEAD_SHA"; then
+            gh workflow run "$DEPLOY_WORKFLOW" --repo "$repo" --ref "$MAIN"
+            exit 0
+          fi
+          state="$(gh pr view "$pr" --repo "$repo" --json state,mergeStateStatus --jq '.state + " " + .mergeStateStatus')"
+          case "$state" in
+            MERGED*)
+              echo "::notice::#$pr was already merged."
+              ;;
+            "OPEN BEHIND"|"OPEN DIRTY")
+              # Dependabot rebases it, and CI on the rebased commit brings it back here.
+              gh pr comment "$pr" --repo "$repo" --body "@dependabot rebase"
+              echo "::notice::main moved on; Dependabot was asked to rebase #$pr."
+              ;;
+            *)
+              echo "::error::Merging #$pr failed and it is $state."
+              exit 1
+              ;;
+          esac
